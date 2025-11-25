@@ -14,8 +14,8 @@ export default async function BenchGenPage(): Promise<JSX.Element> {
     searchIdeationSources({ page: 1, pageSize: 6 }),
   ]);
 
-  const prompt = promptResult.success ? promptResult.prompt : null;
-  const error = !promptResult.success ? promptResult.error : null;
+  const prompt = promptResult.success && promptResult.prompt ? promptResult.prompt : null;
+  const error = !promptResult.success && promptResult.error ? promptResult.error : null;
 
   return (
     <BenchGenWorkspace

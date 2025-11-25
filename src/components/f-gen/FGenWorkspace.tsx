@@ -59,12 +59,13 @@ export default function FGenWorkspace({
     generateSourcesReport().then((result) => {
       setIsGeneratingReport(false);
       if (result.success && result.report) {
-        setSourcesReport(result.report);
+        const report = result.report;
+        setSourcesReport(report);
         setShowReport(true);
         setSystemMessages((prev) => [
           ...prev,
-          `✅ Report generated! Analyzed ${result.report.total} sources`,
-          `📈 Excellent: ${result.report.summary.excellent} | Good: ${result.report.summary.good} | Fair: ${result.report.summary.fair} | Poor: ${result.report.summary.poor}`,
+          `✅ Report generated! Analyzed ${report.total} sources`,
+          `📈 Excellent: ${report.summary.excellent} | Good: ${report.summary.good} | Fair: ${report.summary.fair} | Poor: ${report.summary.poor}`,
         ]);
       } else {
         setSystemMessages((prev) => [...prev, `❌ ${result.error || 'Failed to generate report'}`]);

@@ -140,6 +140,8 @@ export default function MainGeneratorWorkspace({
     const labels: Record<SourceUsageKey, string> = {
       wisdom: 'Wisdom',
       greeting: 'Greeting',
+      'bench-boss': 'Bench Boss',
+      'captain-heart': 'Captain Heart',
       motivational: 'Motivational',
       stat: 'Stat',
       fact: 'Fact',

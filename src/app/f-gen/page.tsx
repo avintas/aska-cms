@@ -13,9 +13,9 @@ export default async function FGenPage(): Promise<JSX.Element> {
     getSources(),
   ]);
 
-  const prompt = promptResult.success ? promptResult.prompt : null;
-  const sources = sourcesResult.success ? sourcesResult.sources : [];
-  const error = !promptResult.success ? promptResult.error : null;
+  const prompt = promptResult.success && promptResult.prompt ? promptResult.prompt : null;
+  const sources = sourcesResult.success && sourcesResult.sources ? sourcesResult.sources : [];
+  const error = !promptResult.success && promptResult.error ? promptResult.error : null;
 
   return (
     <FGenWorkspace
