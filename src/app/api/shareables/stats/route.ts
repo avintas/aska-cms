@@ -18,7 +18,7 @@ interface StatsResponse {
  * Gets statistics for collection items and published sets
  *
  * Query params:
- *   type: 'motivational' | 'facts'
+ *   type: 'motivational' | 'facts' | 'wisdom'
  *
  * Response:
  * {
@@ -28,7 +28,7 @@ interface StatsResponse {
  *     published: number,
  *     archived: number,
  *     unpublished: number,
- *     publishedSets: number  // Count from pub_shareables_motivational or pub_shareables_facts
+ *     publishedSets: number  // Count from pub_shareables_motivational, pub_shareables_facts, or pub_shareables_wisdom
  *   },
  *   error?: string
  * }
@@ -44,15 +44,25 @@ export async function GET(request: NextRequest): Promise<NextResponse<StatsRespo
     const { searchParams } = new URL(request.url);
     const type = searchParams.get('type');
 
-    if (!type || (type !== 'motivational' && type !== 'facts')) {
+    if (!type || (type !== 'motivational' && type !== 'facts' && type !== 'wisdom')) {
       return NextResponse.json(
-        { success: false, error: 'Invalid type. Must be "motivational" or "facts"' },
+        { success: false, error: 'Invalid type. Must be "motivational", "facts", or "wisdom"' },
         { status: 400 },
       );
     }
 
-    const tableName = type === 'motivational' ? 'collection_motivational' : 'collection_facts';
-    const pubTableName = type === 'motivational' ? 'pub_shareables_motivational' : 'pub_shareables_facts';
+    const tableName =
+      type === 'motivational'
+        ? 'collection_motivational'
+        : type === 'facts'
+          ? 'collection_facts'
+          : 'collection_wisdom';
+    const pubTableName =
+      type === 'motivational'
+        ? 'pub_shareables_motivational'
+        : type === 'facts'
+          ? 'pub_shareables_facts'
+          : 'pub_shareables_wisdom';
 
     console.log(`Fetching stats for table: ${tableName}`);
 

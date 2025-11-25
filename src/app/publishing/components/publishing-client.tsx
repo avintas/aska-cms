@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import ShareableItemCard from './ShareableItemCard';
 
-type ContentType = 'motivational' | 'facts';
+type ContentType = 'motivational' | 'facts' | 'wisdom';
 
 interface Stats {
   total: number;
@@ -182,8 +182,14 @@ export default function PublishingClient(): JSX.Element {
 
       // Then, update individual items to published status
       const publishPromises = selectedItems.map((item) => {
-        const apiEndpoint =
-          contentType === 'motivational' ? `/api/motivational/${item.id}` : `/api/facts/${item.id}`;
+        let apiEndpoint: string;
+        if (contentType === 'motivational') {
+          apiEndpoint = `/api/motivational/${item.id}`;
+        } else if (contentType === 'facts') {
+          apiEndpoint = `/api/facts/${item.id}`;
+        } else {
+          apiEndpoint = `/api/wisdom/${item.id}`;
+        }
         return fetch(apiEndpoint, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
@@ -254,6 +260,7 @@ export default function PublishingClient(): JSX.Element {
         >
           <option value="motivational">Motivational</option>
           <option value="facts">Facts</option>
+          <option value="wisdom">Wisdom</option>
         </select>
       </div>
 
@@ -262,7 +269,12 @@ export default function PublishingClient(): JSX.Element {
         <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
           <div className="mb-4">
             <div className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">
-              {contentType === 'motivational' ? 'Motivational' : 'Facts'} Statistics
+              {contentType === 'motivational'
+                ? 'Motivational'
+                : contentType === 'facts'
+                  ? 'Facts'
+                  : 'Wisdom'}{' '}
+              Statistics
             </div>
           </div>
 

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createApiClient } from '@/utils/supabase/api-client';
 
-type ContentType = 'motivational' | 'facts';
+type ContentType = 'motivational' | 'facts' | 'wisdom';
 
 interface RandomRequest {
   content_type: ContentType;
@@ -11,11 +11,11 @@ interface RandomRequest {
 
 /**
  * POST /api/shareables/random
- * Randomly picks items from collection_motivational or collection_facts
+ * Randomly picks items from collection_motivational, collection_facts, or collection_wisdom
  * 
  * Request body:
  * {
- *   content_type: 'motivational' | 'facts',
+ *   content_type: 'motivational' | 'facts' | 'wisdom',
  *   count: number
  * }
  * 
@@ -44,9 +44,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    if (body.content_type !== 'motivational' && body.content_type !== 'facts') {
+    if (
+      body.content_type !== 'motivational' &&
+      body.content_type !== 'facts' &&
+      body.content_type !== 'wisdom'
+    ) {
       return NextResponse.json(
-        { success: false, error: 'Invalid content_type. Must be "motivational" or "facts"' },
+        { success: false, error: 'Invalid content_type. Must be "motivational", "facts", or "wisdom"' },
         { status: 400 }
       );
     }
@@ -58,7 +62,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    const tableName = body.content_type === 'motivational' ? 'collection_motivational' : 'collection_facts';
+    const tableName =
+      body.content_type === 'motivational'
+        ? 'collection_motivational'
+        : body.content_type === 'facts'
+          ? 'collection_facts'
+          : 'collection_wisdom';
 
     // Fetch all items excluding archived
     const { data: allItems, error: fetchError } = await supabase

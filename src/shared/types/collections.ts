@@ -188,6 +188,89 @@ export interface FactFetchParams {
 }
 
 // ========================================================================
+// HOCKEY FACTS (F-Gen)
+// ========================================================================
+
+export interface HockeyFact {
+  id: number;
+  text: string;
+  category: string | null;
+  status: ContentStatus | null;
+  theme: string | null;
+  source_content_id: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface HockeyFactCreateInput {
+  text: string;
+  category?: string;
+  status?: ContentStatus;
+  theme?: string;
+  source_content_id?: number;
+}
+
+export interface HockeyFactUpdateInput {
+  text?: string;
+  category?: string;
+  status?: ContentStatus;
+  theme?: string;
+  source_content_id?: number;
+}
+
+export interface HockeyFactFetchParams {
+  status?: ContentStatus;
+  theme?: string;
+  category?: string;
+  source_content_id?: number;
+  limit?: number;
+  offset?: number;
+}
+
+// ========================================================================
+// HOCKEY MOTIVATIONAL
+// ========================================================================
+
+export interface HockeyMotivate {
+  id: number;
+  quote: string;
+  theme: string | null;
+  category: string | null;
+  attribution: string | null;
+  status: ContentStatus | null;
+  source_content_id: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface HockeyMotivateCreateInput {
+  quote: string;
+  theme?: string;
+  category?: string;
+  attribution?: string;
+  status?: ContentStatus;
+  source_content_id?: number;
+}
+
+export interface HockeyMotivateUpdateInput {
+  quote?: string;
+  theme?: string;
+  category?: string;
+  attribution?: string;
+  status?: ContentStatus;
+  source_content_id?: number;
+}
+
+export interface HockeyMotivateFetchParams {
+  status?: ContentStatus;
+  theme?: string;
+  category?: string;
+  source_content_id?: number;
+  limit?: number;
+  offset?: number;
+}
+
+// ========================================================================
 // MOTIVATIONAL
 // ========================================================================
 

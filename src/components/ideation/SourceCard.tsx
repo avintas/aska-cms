@@ -16,6 +16,14 @@ const USAGE_META: Record<SourceUsageKey, { label: string; tone: string }> = {
     label: 'Greeting',
     tone: 'bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-200',
   },
+  'bench-boss': {
+    label: 'Bench Boss',
+    tone: 'bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-200',
+  },
+  'captain-heart': {
+    label: 'Captain Heart',
+    tone: 'bg-pink-100 text-pink-700 dark:bg-pink-900/40 dark:text-pink-200',
+  },
   motivational: {
     label: 'Motivational',
     tone: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200',

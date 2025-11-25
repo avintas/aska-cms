@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createApiClient } from '@/utils/supabase/api-client';
 
-type ContentType = 'motivational' | 'facts';
+type ContentType = 'motivational' | 'facts' | 'wisdom';
 type Status = 'unpublished' | 'published' | 'archived';
 
 interface PublishRequest {
@@ -16,7 +16,7 @@ interface PublishRequest {
  * 
  * Request body:
  * {
- *   content_type: 'motivational' | 'facts',
+ *   content_type: 'motivational' | 'facts' | 'wisdom',
  *   items: any[],
  *   status: 'unpublished' | 'published' | 'archived'
  * }
@@ -46,9 +46,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    if (body.content_type !== 'motivational' && body.content_type !== 'facts') {
+    if (
+      body.content_type !== 'motivational' &&
+      body.content_type !== 'facts' &&
+      body.content_type !== 'wisdom'
+    ) {
       return NextResponse.json(
-        { success: false, error: 'Invalid content_type. Must be "motivational" or "facts"' },
+        { success: false, error: 'Invalid content_type. Must be "motivational", "facts", or "wisdom"' },
         { status: 400 }
       );
     }
@@ -67,7 +71,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    const tableName = body.content_type === 'motivational' ? 'pub_shareables_motivational' : 'pub_shareables_facts';
+    const tableName =
+      body.content_type === 'motivational'
+        ? 'pub_shareables_motivational'
+        : body.content_type === 'facts'
+          ? 'pub_shareables_facts'
+          : 'pub_shareables_wisdom';
 
     console.log(`Creating published set in table: ${tableName}`);
     console.log(`Items count: ${body.items.length}`);

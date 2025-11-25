@@ -6,7 +6,11 @@ interface ShareableItem {
   id: number;
   quote?: string;
   fact?: string;
+  fact_text?: string;
   stat_text?: string;
+  title?: string;
+  musing?: string;
+  from_the_box?: string;
   author?: string | null;
   context?: string | null;
   attribution?: string | null;
@@ -16,7 +20,7 @@ interface ShareableItem {
 
 interface ShareableItemCardProps {
   item: ShareableItem;
-  contentType: 'motivational' | 'facts';
+  contentType: 'motivational' | 'facts' | 'wisdom';
   onStatusChange?: (id: number, newStatus: string) => void;
   onDelete?: (id: number) => void;
   onRemove?: (id: number) => void;
@@ -34,6 +38,7 @@ export default function ShareableItemCard({
     (typeof item.fact_text === 'string' ? item.fact_text : '') ||
     (typeof item.fact === 'string' ? item.fact : '') ||
     (typeof item.stat_text === 'string' ? item.stat_text : '') ||
+    (typeof item.title === 'string' ? item.title : '') ||
     '';
   const status = item.status || 'unpublished';
   const isPublished = status === 'published';
@@ -42,12 +47,25 @@ export default function ShareableItemCard({
   // Copy to clipboard
   const handleCopy = async (): Promise<void> => {
     try {
-      let textToCopy: string = displayText;
-      if (item.author && typeof item.author === 'string') {
-        textToCopy = `${textToCopy}\n— ${item.author}`;
-      }
-      if (item.context && typeof item.context === 'string') {
-        textToCopy = `${textToCopy}\n${item.context}`;
+      let textToCopy: string = '';
+      if (contentType === 'wisdom') {
+        if (item.title && typeof item.title === 'string') {
+          textToCopy = item.title;
+        }
+        if (item.musing && typeof item.musing === 'string') {
+          textToCopy = textToCopy ? `${textToCopy}\n\n${item.musing}` : item.musing;
+        }
+        if (item.from_the_box && typeof item.from_the_box === 'string') {
+          textToCopy = textToCopy ? `${textToCopy}\n\n${item.from_the_box}` : item.from_the_box;
+        }
+      } else {
+        textToCopy = displayText;
+        if (item.author && typeof item.author === 'string') {
+          textToCopy = `${textToCopy}\n— ${item.author}`;
+        }
+        if (item.context && typeof item.context === 'string') {
+          textToCopy = `${textToCopy}\n${item.context}`;
+        }
       }
       if (item.attribution && typeof item.attribution === 'string') {
         textToCopy = `${textToCopy}\nSource: ${item.attribution}`;
@@ -64,8 +82,14 @@ export default function ShareableItemCard({
     if (!onStatusChange) return;
 
     try {
-      const apiEndpoint =
-        contentType === 'motivational' ? `/api/motivational/${item.id}` : `/api/facts/${item.id}`;
+      let apiEndpoint: string;
+      if (contentType === 'motivational') {
+        apiEndpoint = `/api/motivational/${item.id}`;
+      } else if (contentType === 'facts') {
+        apiEndpoint = `/api/facts/${item.id}`;
+      } else {
+        apiEndpoint = `/api/wisdom/${item.id}`;
+      }
       const response = await fetch(apiEndpoint, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -97,8 +121,14 @@ export default function ShareableItemCard({
     }
 
     try {
-      const apiEndpoint =
-        contentType === 'motivational' ? `/api/motivational/${item.id}` : `/api/facts/${item.id}`;
+      let apiEndpoint: string;
+      if (contentType === 'motivational') {
+        apiEndpoint = `/api/motivational/${item.id}`;
+      } else if (contentType === 'facts') {
+        apiEndpoint = `/api/facts/${item.id}`;
+      } else {
+        apiEndpoint = `/api/wisdom/${item.id}`;
+      }
       const response = await fetch(apiEndpoint, {
         method: 'DELETE',
       });
@@ -123,9 +153,25 @@ export default function ShareableItemCard({
       </div>
 
       {/* Content */}
-      <p className="mb-2 text-sm text-gray-900 leading-relaxed dark:text-gray-100">
-        {contentType === 'motivational' ? `"${displayText}"` : displayText}
-      </p>
+      <div className="mb-2">
+        {contentType === 'wisdom' ? (
+          <div className="space-y-2">
+            {item.title && typeof item.title === 'string' && (
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">{item.title}</h3>
+            )}
+            {item.musing && typeof item.musing === 'string' && (
+              <p className="text-sm text-gray-900 leading-relaxed dark:text-gray-100">{item.musing}</p>
+            )}
+            {item.from_the_box && typeof item.from_the_box === 'string' && (
+              <p className="text-xs italic text-gray-700 dark:text-gray-300">{item.from_the_box}</p>
+            )}
+          </div>
+        ) : (
+          <p className="text-sm text-gray-900 leading-relaxed dark:text-gray-100">
+            {contentType === 'motivational' ? `"${displayText}"` : displayText}
+          </p>
+        )}
+      </div>
 
       {/* Author - who said the quote */}
       {item.author && typeof item.author === 'string' && (

@@ -6,6 +6,7 @@ import { handleGeminiError } from '../error-handler';
 export interface FactsGenerationRequest {
   sourceContent: string;
   customPrompt: string;
+  articleDate?: string | null;
 }
 
 export interface FactsGenerationResponse {
@@ -18,7 +19,7 @@ export async function generateFactsContent(
   request: FactsGenerationRequest,
 ): Promise<FactsGenerationResponse> {
   try {
-    const { sourceContent, customPrompt } = request;
+    const { sourceContent, customPrompt, articleDate } = request;
 
     if (!sourceContent?.trim()) {
       return {
@@ -34,12 +35,33 @@ export async function generateFactsContent(
       };
     }
 
+    // Process prompt placeholders
+    let processedPrompt = customPrompt;
+    
+    // Replace {{ARTICLE_DATE}} with actual date or current date
+    const dateToUse = articleDate 
+      ? new Date(articleDate).toISOString().split('T')[0] // Format as YYYY-MM-DD
+      : new Date().toISOString().split('T')[0];
+    processedPrompt = processedPrompt.replace(/\{\{ARTICLE_DATE\}\}/g, dateToUse);
+    
+    // Replace {{PASTE_YOUR_CONTENT_HERE}} with source content
+    processedPrompt = processedPrompt.replace(/\{\{PASTE_YOUR_CONTENT_HERE\}\}/g, sourceContent);
+    
+    // Also handle <source_text> tags if present (for backward compatibility)
+    processedPrompt = processedPrompt.replace(/<source_text>/g, sourceContent);
+    processedPrompt = processedPrompt.replace(/<\/source_text>/g, '');
+    
+    // If no placeholders were found, append source content at the end (backward compatibility)
+    if (!processedPrompt.includes(sourceContent)) {
+      processedPrompt = `${processedPrompt}\n\n<source_text>\n${sourceContent}\n</source_text>`;
+    }
+
     const result = await gemini.models.generateContent({
       model: 'gemini-2.0-flash-exp',
       contents: [
         {
           role: 'user',
-          parts: [{ text: `${customPrompt}\n\nSource Content:\n${sourceContent}` }],
+          parts: [{ text: processedPrompt }],
         },
       ],
       config: {

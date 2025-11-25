@@ -34,12 +34,17 @@ const USAGE_ORDER: SourceUsageKey[] = [
   'who-am-i',
 ];
 
-const SOURCE_USAGE_TABLES: Array<{ table: string; key: SourceUsageKey }> = [
+const SOURCE_USAGE_TABLES: Array<{ table: string; key: SourceUsageKey; attributionField?: string; attributionValue?: string }> = [
   { table: 'collection_wisdom', key: 'wisdom' },
+  { table: 'collection_hockey_wisdom', key: 'wisdom' }, // W-Gen route uses this table
   { table: 'collection_greetings', key: 'greeting' },
-  { table: 'collection_motivational', key: 'motivational' },
+  { table: 'collection_motivational', key: 'motivational' }, // Legacy table
+  // collection_hockey_motivate uses attribution field to determine character-specific badges
+  { table: 'collection_hockey_motivate', key: 'bench-boss', attributionField: 'attribution', attributionValue: 'Bench Boss' },
+  { table: 'collection_hockey_motivate', key: 'captain-heart', attributionField: 'attribution', attributionValue: 'Captain Heart' },
   { table: 'collection_stats', key: 'stat' },
   { table: 'collection_facts', key: 'fact' },
+  { table: 'collection_hockey_facts', key: 'fact' }, // F-Gen route uses this table
   { table: 'trivia_multiple_choice', key: 'multiple-choice' },
   { table: 'trivia_true_false', key: 'true-false' },
   { table: 'trivia_who_am_i', key: 'who-am-i' },
@@ -85,11 +90,18 @@ async function buildSourceUsageMap(
   }
 
   await Promise.all(
-    SOURCE_USAGE_TABLES.map(async ({ table, key }) => {
-      const { data, error } = await supabase
+    SOURCE_USAGE_TABLES.map(async ({ table, key, attributionField, attributionValue }) => {
+      let query = supabase
         .from(table)
         .select('source_content_id')
         .in('source_content_id', sourceIds);
+
+      // If attributionField is specified, filter by attribution value (for character-specific badges)
+      if (attributionField && attributionValue) {
+        query = query.eq(attributionField, attributionValue);
+      }
+
+      const { data, error } = await query;
       if (error) return;
       for (const row of data ?? []) {
         const sourceId = (row as { source_content_id?: number | null }).source_content_id;

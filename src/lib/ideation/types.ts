@@ -65,7 +65,9 @@ export interface IdeationSearchResult {
 export type SourceUsageKey =
   | 'wisdom'
   | 'greeting'
-  | 'motivational'
+  | 'bench-boss'
+  | 'captain-heart'
+  | 'motivational' // Legacy/fallback - will be phased out
   | 'stat'
   | 'fact'
   | 'multiple-choice'

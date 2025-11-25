@@ -9,7 +9,7 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        'primary-brand': '#10b981', // Example custom color
+        'primary-brand': '#475569', // Slate-600 - dark grey
       },
     },
   },
