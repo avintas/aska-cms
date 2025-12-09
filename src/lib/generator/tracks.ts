@@ -387,7 +387,7 @@ export const generatorTracks: GeneratorTrackRegistry = {
     shortLabel: 'Wisdom',
     description: 'Penalty Box Philosopher musings ready for shareable storytelling.',
     promptType: 'generator_wisdom',
-    targetTable: 'collection_wisdom',
+    targetTable: 'collection_hockey_wisdom',
     defaultStatus: 'draft',
     adapter: {
       run: (args) => generateWisdomContent(args),
@@ -425,7 +425,7 @@ export const generatorTracks: GeneratorTrackRegistry = {
     shortLabel: 'Motivation',
     description: 'Locker room ready motivation with quick share appeal.',
     promptType: 'generator_motivational',
-    targetTable: 'collection_motivational',
+    targetTable: 'collection_hockey_motivate',
     defaultStatus: 'draft',
     adapter: {
       run: (args) => generateMotivationalContent(args),
@@ -444,7 +444,7 @@ export const generatorTracks: GeneratorTrackRegistry = {
     shortLabel: 'Facts',
     description: 'Snackable fact nuggets anchored in authentic hockey data.',
     promptType: 'generator_facts',
-    targetTable: 'collection_facts',
+    targetTable: 'collection_hockey_facts',
     defaultStatus: 'draft',
     adapter: {
       run: (args) => generateFactsContent(args),

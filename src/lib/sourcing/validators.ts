@@ -223,6 +223,7 @@ export function validateEnrichedContent(input: unknown): {
 export interface ContentSuitabilityAnalysis {
   multiple_choice_trivia?: { suitable: boolean; confidence: number; reasoning: string };
   true_false_trivia?: { suitable: boolean; confidence: number; reasoning: string };
+  who_am_i_trivia?: { suitable: boolean; confidence: number; reasoning: string };
   motivational?: { suitable: boolean; confidence: number; reasoning: string };
   facts?: { suitable: boolean; confidence: number; reasoning: string };
   wisdom?: { suitable: boolean; confidence: number; reasoning: string };
@@ -239,6 +240,7 @@ export function validateContentSuitabilityAnalysis(input: unknown): {
   const contentTypes = [
     'multiple_choice_trivia',
     'true_false_trivia',
+    'who_am_i_trivia',
     'motivational',
     'facts',
     'wisdom',
