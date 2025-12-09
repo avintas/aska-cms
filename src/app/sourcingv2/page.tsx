@@ -8,7 +8,7 @@ import {
   autoIngestClipboardAction,
   ingestSourceContentAction,
   type IngestState,
-} from './actions';
+} from '../sourcing/actions';
 import {
   FormCard,
   FormField,
@@ -31,7 +31,7 @@ interface EditableMetadata {
   summary: string;
 }
 
-export default function SourcingPage(): JSX.Element {
+export default function SourcingPageV2(): JSX.Element {
   const [currentStep, setCurrentStep] = useState<WorkflowStep>('input');
   const [content, setContent] = useState('');
   const [title, setTitle] = useState('');
@@ -522,3 +522,4 @@ function SpinnerIcon(props: React.SVGProps<SVGSVGElement>): JSX.Element {
     </svg>
   );
 }
+

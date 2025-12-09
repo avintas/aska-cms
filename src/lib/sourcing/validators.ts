@@ -220,4 +220,69 @@ export function validateEnrichedContent(input: unknown): {
   };
 }
 
+export interface ContentSuitabilityAnalysis {
+  multiple_choice_trivia?: { suitable: boolean; confidence: number; reasoning: string };
+  true_false_trivia?: { suitable: boolean; confidence: number; reasoning: string };
+  motivational?: { suitable: boolean; confidence: number; reasoning: string };
+  facts?: { suitable: boolean; confidence: number; reasoning: string };
+  wisdom?: { suitable: boolean; confidence: number; reasoning: string };
+}
+
+export function validateContentSuitabilityAnalysis(input: unknown): {
+  valid: boolean;
+  errors: string[];
+  value?: ContentSuitabilityAnalysis;
+} {
+  const errors: string[] = [];
+  const obj = input as Record<string, unknown>;
+
+  const contentTypes = [
+    'multiple_choice_trivia',
+    'true_false_trivia',
+    'motivational',
+    'facts',
+    'wisdom',
+  ];
+
+  const result: ContentSuitabilityAnalysis = {};
+
+  for (const contentType of contentTypes) {
+    const analysis = obj?.[contentType] as Record<string, unknown> | undefined;
+    if (analysis) {
+      const suitable = analysis.suitable as boolean | undefined;
+      const confidence = analysis.confidence as number | undefined;
+      const reasoning = analysis.reasoning as string | undefined;
+
+      if (typeof suitable !== 'boolean') {
+        errors.push(`${contentType}.suitable must be a boolean`);
+        continue;
+      }
+      if (typeof confidence !== 'number' || confidence < 0 || confidence > 1) {
+        errors.push(`${contentType}.confidence must be a number between 0 and 1`);
+        continue;
+      }
+      if (typeof reasoning !== 'string') {
+        errors.push(`${contentType}.reasoning must be a string`);
+        continue;
+      }
+
+      result[contentType as keyof ContentSuitabilityAnalysis] = {
+        suitable,
+        confidence,
+        reasoning,
+      };
+    }
+  }
+
+  if (errors.length > 0) {
+    return { valid: false, errors };
+  }
+
+  return {
+    valid: true,
+    errors: [],
+    value: result,
+  };
+}
+
 

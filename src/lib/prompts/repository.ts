@@ -4,6 +4,7 @@ import { createServerClient } from '@/utils/supabase/server';
 export type PromptType =
   | 'metadata_extraction'
   | 'content_enrichment'
+  | 'content_suitability_analysis'
   | 'generator_wisdom'
   | 'generator_greetings'
   | 'generator_motivational'

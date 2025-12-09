@@ -5,8 +5,10 @@ import { cleanJsonString } from '@/lib/content-helpers';
 import {
   validateEnrichedContent,
   validateExtractedMetadata,
+  validateContentSuitabilityAnalysis,
   type EnrichedContent,
   type ExtractedMetadata,
+  type ContentSuitabilityAnalysis,
 } from './validators';
 import { handleGeminiError } from '@/lib/gemini/error-handler';
 
@@ -96,6 +98,50 @@ export async function enrichContent(
         key_phrases: value.key_phrases,
       },
     };
+  } catch (error) {
+    const err = handleGeminiError(error);
+    return { success: false, error: err.error };
+  }
+}
+
+/**
+ * Run Gemini with a DB-loaded prompt to analyze content suitability for different content types.
+ */
+export async function analyzeContentSuitability(
+  processedText: string,
+  promptContent: string,
+): Promise<{ success: true; data: ContentSuitabilityAnalysis } | { success: false; error: string }> {
+  try {
+    const fullPrompt = `${promptContent.trim()}
+
+Source Content:
+${processedText}`;
+
+    const result = await gemini.models.generateContent({
+      model: 'gemini-2.0-flash-exp',
+      contents: [
+        {
+          role: 'user',
+          parts: [{ text: fullPrompt }],
+        },
+      ],
+      config: {
+        responseMimeType: 'application/json',
+      },
+    });
+
+    const text = result.text;
+    if (!text) {
+      return { success: false, error: 'Gemini returned an empty response.' };
+    }
+
+    const json = cleanJsonString(text);
+    const parsed = JSON.parse(json) as unknown;
+    const { valid, errors, value } = validateContentSuitabilityAnalysis(parsed);
+    if (!valid || !value) {
+      return { success: false, error: `AI output validation failed: ${errors.join('; ')}` };
+    }
+    return { success: true, data: value };
   } catch (error) {
     const err = handleGeminiError(error);
     return { success: false, error: err.error };
