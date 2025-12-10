@@ -1,0 +1,182 @@
+[1mdiff --git a/src/app/sourcing-backup/page.tsx b/src/app/sourcing-backup/page.tsx[m
+[1mindex b3ad280..c7ceb79 100644[m
+[1m--- a/src/app/sourcing-backup/page.tsx[m
+[1m+++ b/src/app/sourcing-backup/page.tsx[m
+[36m@@ -1,9 +1,8 @@[m
+ 'use client';[m
+ [m
+ import { useActionState } from 'react';[m
+[31m-import { useCallback, useEffect, useMemo, useState, useTransition } from 'react';[m
+[32m+[m[32mimport { useCallback, useEffect, useState, useTransition } from 'react';[m
+ import Link from 'next/link';[m
+[31m-import { processText } from '@/lib/text-processing';[m
+ import {[m
+   autoIngestClipboardAction,[m
+   ingestSourceContentAction,[m
+[36m@@ -11,10 +10,8 @@[m [mimport {[m
+ } from './actions';[m
+ import {[m
+   FormCard,[m
+[31m-  FormField,[m
+   PrimaryButton,[m
+   SecondaryButton,[m
+[31m-  TextArea,[m
+   TextInput,[m
+ } from '@/components/ui/FormKit';[m
+ [m
+[36m@@ -26,7 +23,6 @@[m [minterface EditableMetadata {[m
+   title: string;[m
+   category: string;[m
+   tags: string[];[m
+[31m-  author: string;[m
+   theme: string;[m
+   summary: string;[m
+ }[m
+[36m@@ -35,15 +31,11 @@[m [mexport default function SourcingPage(): JSX.Element {[m
+   const [currentStep, setCurrentStep] = useState<WorkflowStep>('input');[m
+   const [content, setContent] = useState('');[m
+   const [title, setTitle] = useState('');[m
+[31m-  const [wordCount, setWordCount] = useState(0);[m
+[31m-  const [charCount, setCharCount] = useState(0);[m
+[31m-  const [processing, setProcessing] = useState(false);[m
+   const [preview, setPreview] = useState<string>('');[m
+[31m-  const [state, formAction] = useActionState(ingestSourceContentAction, initialState);[m
+[31m-  const [isPending, startTransition] = useTransition();[m
+[32m+[m[32m  const [state] = useActionState(ingestSourceContentAction, initialState);[m
+[32m+[m[32m  const [isPending] = useTransition();[m
+   const [autoStatus, setAutoStatus] = useState<IngestState | null>(null);[m
+   const [autoProcessing, setAutoProcessing] = useState(false);[m
+[31m-  const [manualSubmitting, setManualSubmitting] = useState(false);[m
+   const [extractedMetadata, setExtractedMetadata] = useState<EditableMetadata | null>(null);[m
+   const [hasClipboardAccess, setHasClipboardAccess] = useState(false);[m
+   const [ingestionComplete, setIngestionComplete] = useState(false);[m
+[36m@@ -53,18 +45,6 @@[m [mexport default function SourcingPage(): JSX.Element {[m
+     setHasClipboardAccess(typeof navigator !== 'undefined' && !!navigator.clipboard?.readText);[m
+   }, []);[m
+ [m
+[31m-  // Calculate word/char count[m
+[31m-  useEffect(() => {[m
+[31m-    const wc = content.trim()[m
+[31m-      ? content[m
+[31m-          .trim()[m
+[31m-          .split(/\s+/)[m
+[31m-          .filter((w) => w.length > 0).length[m
+[31m-      : 0;[m
+[31m-    setWordCount(wc);[m
+[31m-    setCharCount(content.length);[m
+[31m-  }, [content]);[m
+[31m-[m
+   // Update extracted metadata when ingestion completes[m
+   useEffect(() => {[m
+     const feedbackState = autoStatus ?? state;[m
+[36m@@ -73,7 +53,6 @@[m [mexport default function SourcingPage(): JSX.Element {[m
+         title: feedbackState.metadata.title,[m
+         category: feedbackState.metadata.category || '',[m
+         tags: feedbackState.metadata.tags || [],[m
+[31m-        author: '',[m
+         theme: feedbackState.metadata.theme,[m
+         summary: feedbackState.metadata.summary,[m
+       });[m
+[36m@@ -82,16 +61,7 @@[m [mexport default function SourcingPage(): JSX.Element {[m
+     }[m
+   }, [state, autoStatus]);[m
+ [m
+[31m-  const isBusy = processing || isPending || autoProcessing || manualSubmitting;[m
+[31m-[m
+[31m-  const onPaste = async (): Promise<void> => {[m
+[31m-    try {[m
+[31m-      const text = await navigator.clipboard.readText();[m
+[31m-      setContent((prev) => (prev ? `${prev}\n${text}` : text));[m
+[31m-    } catch {[m
+[31m-      // ignore[m
+[31m-    }[m
+[31m-  };[m
+[32m+[m[32m  const isBusy = isPending || autoProcessing;[m
+ [m
+   const onClear = useCallback((): void => {[m
+     setContent('');[m
+[36m@@ -103,39 +73,6 @@[m [mexport default function SourcingPage(): JSX.Element {[m
+     setIngestionComplete(false);[m
+   }, []);[m
+ [m
+[31m-  const onProcess = async (): Promise<void> => {[m
+[31m-    if (!content.trim()) return;[m
+[31m-    setProcessing(true);[m
+[31m-    setCurrentStep('processing');[m
+[31m-    try {[m
+[31m-      const res = await processText(content);[m
+[31m-      setPreview(res.processedText);[m
+[31m-      setWordCount(res.wordCount);[m
+[31m-      setCharCount(res.charCount);[m
+[31m-      // After processing, trigger ingestion[m
+[31m-      await handleIngest(res.processedText);[m
+[31m-    } finally {[m
+[31m-      setProcessing(false);[m
+[31m-    }[m
+[31m-  };[m
+[31m-[m
+[31m-  const handleIngest = useCallback([m
+[31m-    async (processedContent?: string): Promise<void> => {[m
+[31m-      if (manualSubmitting || isPending) return;[m
+[31m-      setManualSubmitting(true);[m
+[31m-      try {[m
+[31m-        const formData = new FormData();[m
+[31m-        formData.append('content', processedContent || preview || content);[m
+[31m-        formData.append('title', title);[m
+[31m-        // Use formAction which will update state via useActionState[m
+[31m-        await formAction(formData);[m
+[31m-      } finally {[m
+[31m-        setManualSubmitting(false);[m
+[31m-      }[m
+[31m-    },[m
+[31m-    [content, preview, title, formAction, manualSubmitting, isPending],[m
+[31m-  );[m
+[31m-[m
+   const handleAutoIngest = useCallback(async (): Promise<void> => {[m
+     if (autoProcessing || isPending) return;[m
+     if (typeof navigator === 'undefined' || !navigator.clipboard?.readText) {[m
+[36m@@ -200,17 +137,15 @@[m [mexport default function SourcingPage(): JSX.Element {[m
+     onClear();[m
+   }, [onClear]);[m
+ [m
+[31m-  const removeTag = (tagToRemove: string): void => {[m
+[32m+[m[32m  const removeTag = (indexToRemove: number): void => {[m
+     if (!extractedMetadata) return;[m
+     setExtractedMetadata({[m
+       ...extractedMetadata,[m
+[31m-      tags: extractedMetadata.tags.filter((tag) => tag !== tagToRemove),[m
+[32m+[m[32m      tags: extractedMetadata.tags.filter((_, idx) => idx !== indexToRemove),[m
+     });[m
+   };[m
+ [m
+   const feedbackState = autoStatus ?? state;[m
+[31m-  const canProcess = content.trim().length > 0 && !isBusy;[m
+[31m-  const showFinalization = currentStep === 'finalization' && extractedMetadata !== null;[m
+ [m
+   return ([m
+     <div className="space-y-6">[m
+[36m@@ -239,12 +174,12 @@[m [mexport default function SourcingPage(): JSX.Element {[m
+       </StepCard>[m
+ [m
+       {/* Step 2: AI Processing & Review */}[m
+[31m-      {(currentStep === 'processing' || (currentStep === 'review' && extractedMetadata)) && ([m
+[32m+[m[32m      {(currentStep === 'processing' || (currentStep === 'review' && extractedMetadata !== null)) && ([m
+         <StepCard[m
+           stepNumber={2}[m
+           title="AI Processing & Review"[m
+           isActive={currentStep === 'processing' || currentStep === 'review'}[m
+[31m-          isComplete={currentStep === 'review' && extractedMetadata}[m
+[32m+[m[32m          isComplete={currentStep === 'review' && extractedMetadata !== null}[m
+         >[m
+           {currentStep === 'processing' && ([m
+             <div className="flex flex-col items-center justify-center py-12 space-y-4">[m
+[36m@@ -265,10 +200,14 @@[m [mexport default function SourcingPage(): JSX.Element {[m
+ [m
+               <div className="space-y-4">[m
+                 <div>[m
+[31m-                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-2 block">[m
+[32m+[m[32m                  <label[m
+[32m+[m[32m                    htmlFor="extracted-title"[m
+[32m+[m[32m                    className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-2 block"[m
+[32m+[m[32m                  >[m
+         
