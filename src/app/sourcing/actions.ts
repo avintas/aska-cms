@@ -25,7 +25,7 @@ export interface IngestState {
   };
 }
 
-const MAX_INPUT_CHARS = 24000;
+const MAX_INPUT_CHARS = 50000;
 
 interface PipelineInput {
   raw: string;

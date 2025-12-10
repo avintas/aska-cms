@@ -22,6 +22,33 @@ export const ERROR_CODES = {
 } as const;
 
 /**
+ * Safely serialize an error object for server action responses
+ * Extracts only serializable properties from error objects
+ */
+function serializeError(error: unknown): Record<string, unknown> | string {
+  if (error instanceof Error) {
+    return {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+      // Include any additional properties that might be useful
+      ...(error.cause && { cause: serializeError(error.cause) }),
+    };
+  }
+  if (typeof error === 'object' && error !== null) {
+    try {
+      // Try to serialize as JSON to ensure it's serializable
+      JSON.parse(JSON.stringify(error));
+      return error as Record<string, unknown>;
+    } catch {
+      // If not serializable, return string representation
+      return String(error);
+    }
+  }
+  return String(error);
+}
+
+/**
  * Create a ProcessBuilderError with structured information
  */
 export function createError(
@@ -30,11 +57,13 @@ export function createError(
   taskId?: string,
   details?: unknown,
 ): ProcessBuilderError {
+  // Safely serialize error details to ensure server action compatibility
+  const serializedDetails = details !== undefined ? serializeError(details) : undefined;
   return {
     code,
     message,
     taskId,
-    details,
+    details: serializedDetails,
   };
 }
 

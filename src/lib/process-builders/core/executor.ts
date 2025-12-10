@@ -118,7 +118,13 @@ export class ProcessBuilderExecutor {
           {
             code: 'EXECUTION_ERROR',
             message: error instanceof Error ? error.message : 'Unknown error',
-            details: error,
+            details: error instanceof Error 
+              ? {
+                  name: error.name,
+                  message: error.message,
+                  stack: error.stack,
+                }
+              : String(error),
           },
         ],
         executionTime: Date.now() - startTime,

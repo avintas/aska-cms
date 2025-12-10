@@ -15,22 +15,49 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
     // If stats requested, return counts by status
     if (statsOnly) {
-      // Get all items and count by status in memory
-      const { data: allItems } = await supabase.from('trivia_multiple_choice').select('status');
+      // Get total count first
+      const { count: totalCount } = await supabase
+        .from('trivia_multiple_choice')
+        .select('*', { count: 'exact', head: true });
 
-      if (!allItems) {
-        return NextResponse.json({
-          success: true,
-          stats: { unpublished: 0, published: 0, archived: 0 },
-        });
+      const totalRecords = totalCount || 0;
+
+      // Fetch all records in batches to ensure accurate counts
+      // Supabase has a default limit of 1000 rows per query, so we need to paginate
+      const batchSize = 1000;
+      const allStatuses: string[] = [];
+      let offset = 0;
+
+      while (offset < totalRecords) {
+        const { data: batchData, error: batchError } = await supabase
+          .from('trivia_multiple_choice')
+          .select('status')
+          .range(offset, offset + batchSize - 1);
+
+        if (batchError) {
+          // eslint-disable-next-line no-console
+          console.error('Error fetching stats batch:', batchError);
+          break;
+        }
+
+        if (batchData && batchData.length > 0) {
+          allStatuses.push(...batchData.map((item) => item.status || 'null'));
+        }
+
+        // If we got fewer than batchSize, we've reached the end
+        if (!batchData || batchData.length < batchSize) {
+          break;
+        }
+
+        offset += batchSize;
       }
 
       const stats = {
-        unpublished: allItems.filter(
-          (item) => item.status !== 'published' && item.status !== 'archived',
+        unpublished: allStatuses.filter(
+          (status) => status !== 'published' && status !== 'archived',
         ).length,
-        published: allItems.filter((item) => item.status === 'published').length,
-        archived: allItems.filter((item) => item.status === 'archived').length,
+        published: allStatuses.filter((status) => status === 'published').length,
+        archived: allStatuses.filter((status) => status === 'archived').length,
       };
 
       return NextResponse.json({
