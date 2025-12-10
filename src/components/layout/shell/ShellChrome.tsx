@@ -78,11 +78,6 @@ export default function ShellChrome({ children, userEmail }: ShellChromeProps): 
             description: 'Ingest and orchestrate source content.',
           },
           {
-            label: 'Source Content Updater',
-            href: '/source-content-updater',
-            description: 'Refresh metadata for ingested source content.',
-          },
-          {
             label: 'Main Generator',
             href: '/main-generator',
             description: 'Produce shareables and trivia from curated sources.',
@@ -113,14 +108,24 @@ export default function ShellChrome({ children, userEmail }: ShellChromeProps): 
             description: 'Generate warm, supportive, emotional messages using the Captain Heart character.',
           },
           {
-            label: 'Trivia Selector',
-            href: '/trivia-selector',
-            description: 'Classify and prepare trivia questions for use in sets.',
-          },
-          {
             label: 'Build Trivia Set',
             href: '/process-builders/build-trivia-set',
             description: 'Create curated trivia sets from questions (MC, TF, Who Am I).',
+          },
+          {
+            label: 'Build Multiple Choice Sets',
+            href: '/process-builders/build-multiple-choice-sets',
+            description: 'Build multiple choice trivia sets with custom configuration.',
+          },
+          {
+            label: 'Build True/False Sets',
+            href: '/process-builders/build-true-false-sets',
+            description: 'Build true/false trivia sets with custom configuration.',
+          },
+          {
+            label: 'Build Mixed Sets',
+            href: '/process-builders/build-mixed-sets',
+            description: 'Build mixed trivia sets (MC and TF) with custom configuration.',
           },
           {
             label: 'Automated Set Builder',
@@ -131,11 +136,6 @@ export default function ShellChrome({ children, userEmail }: ShellChromeProps): 
             label: 'Collection Trivia Sets',
             href: '/process-builders/collection-trivia-sets',
             description: 'Review created trivia set collections.',
-          },
-          {
-            label: 'Publishing',
-            href: '/publishing',
-            description: 'Generate and manage daily shareable schedules.',
           },
         ],
       },
