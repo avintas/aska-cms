@@ -1,9 +1,8 @@
 'use client';
 
 import { useActionState } from 'react';
-import { useCallback, useEffect, useMemo, useState, useTransition } from 'react';
+import { useCallback, useEffect, useState, useTransition } from 'react';
 import Link from 'next/link';
-import { processText } from '@/lib/text-processing';
 import {
   autoIngestClipboardAction,
   ingestSourceContentAction,
@@ -11,10 +10,8 @@ import {
 } from './actions';
 import {
   FormCard,
-  FormField,
   PrimaryButton,
   SecondaryButton,
-  TextArea,
   TextInput,
 } from '@/components/ui/FormKit';
 
@@ -26,7 +23,6 @@ interface EditableMetadata {
   title: string;
   category: string;
   tags: string[];
-  author: string;
   theme: string;
   summary: string;
 }
@@ -35,15 +31,11 @@ export default function SourcingPage(): JSX.Element {
   const [currentStep, setCurrentStep] = useState<WorkflowStep>('input');
   const [content, setContent] = useState('');
   const [title, setTitle] = useState('');
-  const [wordCount, setWordCount] = useState(0);
-  const [charCount, setCharCount] = useState(0);
-  const [processing, setProcessing] = useState(false);
   const [preview, setPreview] = useState<string>('');
-  const [state, formAction] = useActionState(ingestSourceContentAction, initialState);
-  const [isPending, startTransition] = useTransition();
+  const [state] = useActionState(ingestSourceContentAction, initialState);
+  const [isPending] = useTransition();
   const [autoStatus, setAutoStatus] = useState<IngestState | null>(null);
   const [autoProcessing, setAutoProcessing] = useState(false);
-  const [manualSubmitting, setManualSubmitting] = useState(false);
   const [extractedMetadata, setExtractedMetadata] = useState<EditableMetadata | null>(null);
   const [hasClipboardAccess, setHasClipboardAccess] = useState(false);
   const [ingestionComplete, setIngestionComplete] = useState(false);
@@ -53,18 +45,6 @@ export default function SourcingPage(): JSX.Element {
     setHasClipboardAccess(typeof navigator !== 'undefined' && !!navigator.clipboard?.readText);
   }, []);
 
-  // Calculate word/char count
-  useEffect(() => {
-    const wc = content.trim()
-      ? content
-          .trim()
-          .split(/\s+/)
-          .filter((w) => w.length > 0).length
-      : 0;
-    setWordCount(wc);
-    setCharCount(content.length);
-  }, [content]);
-
   // Update extracted metadata when ingestion completes
   useEffect(() => {
     const feedbackState = autoStatus ?? state;
@@ -73,7 +53,6 @@ export default function SourcingPage(): JSX.Element {
         title: feedbackState.metadata.title,
         category: feedbackState.metadata.category || '',
         tags: feedbackState.metadata.tags || [],
-        author: '',
         theme: feedbackState.metadata.theme,
         summary: feedbackState.metadata.summary,
       });
@@ -82,16 +61,7 @@ export default function SourcingPage(): JSX.Element {
     }
   }, [state, autoStatus]);
 
-  const isBusy = processing || isPending || autoProcessing || manualSubmitting;
-
-  const onPaste = async (): Promise<void> => {
-    try {
-      const text = await navigator.clipboard.readText();
-      setContent((prev) => (prev ? `${prev}\n${text}` : text));
-    } catch {
-      // ignore
-    }
-  };
+  const isBusy = isPending || autoProcessing;
 
   const onClear = useCallback((): void => {
     setContent('');
@@ -102,39 +72,6 @@ export default function SourcingPage(): JSX.Element {
     setAutoStatus(null);
     setIngestionComplete(false);
   }, []);
-
-  const onProcess = async (): Promise<void> => {
-    if (!content.trim()) return;
-    setProcessing(true);
-    setCurrentStep('processing');
-    try {
-      const res = await processText(content);
-      setPreview(res.processedText);
-      setWordCount(res.wordCount);
-      setCharCount(res.charCount);
-      // After processing, trigger ingestion
-      await handleIngest(res.processedText);
-    } finally {
-      setProcessing(false);
-    }
-  };
-
-  const handleIngest = useCallback(
-    async (processedContent?: string): Promise<void> => {
-      if (manualSubmitting || isPending) return;
-      setManualSubmitting(true);
-      try {
-        const formData = new FormData();
-        formData.append('content', processedContent || preview || content);
-        formData.append('title', title);
-        // Use formAction which will update state via useActionState
-        await formAction(formData);
-      } finally {
-        setManualSubmitting(false);
-      }
-    },
-    [content, preview, title, formAction, manualSubmitting, isPending],
-  );
 
   const handleAutoIngest = useCallback(async (): Promise<void> => {
     if (autoProcessing || isPending) return;
@@ -200,17 +137,15 @@ export default function SourcingPage(): JSX.Element {
     onClear();
   }, [onClear]);
 
-  const removeTag = (tagToRemove: string): void => {
+  const removeTag = (indexToRemove: number): void => {
     if (!extractedMetadata) return;
     setExtractedMetadata({
       ...extractedMetadata,
-      tags: extractedMetadata.tags.filter((tag) => tag !== tagToRemove),
+      tags: extractedMetadata.tags.filter((_, idx) => idx !== indexToRemove),
     });
   };
 
   const feedbackState = autoStatus ?? state;
-  const canProcess = content.trim().length > 0 && !isBusy;
-  const showFinalization = currentStep === 'finalization' && extractedMetadata !== null;
 
   return (
     <div className="space-y-6">
@@ -239,12 +174,12 @@ export default function SourcingPage(): JSX.Element {
       </StepCard>
 
       {/* Step 2: AI Processing & Review */}
-      {(currentStep === 'processing' || (currentStep === 'review' && extractedMetadata)) && (
+      {(currentStep === 'processing' || (currentStep === 'review' && extractedMetadata !== null)) && (
         <StepCard
           stepNumber={2}
           title="AI Processing & Review"
           isActive={currentStep === 'processing' || currentStep === 'review'}
-          isComplete={currentStep === 'review' && extractedMetadata}
+          isComplete={currentStep === 'review' && extractedMetadata !== null}
         >
           {currentStep === 'processing' && (
             <div className="flex flex-col items-center justify-center py-12 space-y-4">
@@ -265,10 +200,14 @@ export default function SourcingPage(): JSX.Element {
 
               <div className="space-y-4">
                 <div>
-                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-2 block">
+                  <label
+                    htmlFor="extracted-title"
+                    className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-2 block"
+                  >
                     Extracted Title:
                   </label>
                   <TextInput
+                    id="extracted-title"
                     value={extractedMetadata.title}
                     onChange={(e) =>
                       setExtractedMetadata({ ...extractedMetadata, title: e.target.value })
@@ -298,7 +237,7 @@ export default function SourcingPage(): JSX.Element {
                   </label>
                   <div className="flex flex-wrap gap-2">
                     {extractedMetadata.tags.map((tag, idx) => (
-                      <InteractiveTagPill key={idx} onRemove={() => removeTag(tag)}>
+                      <InteractiveTagPill key={`${tag}-${idx}`} onRemove={() => removeTag(idx)}>
                         {tag}
                       </InteractiveTagPill>
                     ))}
@@ -391,7 +330,7 @@ export default function SourcingPage(): JSX.Element {
                     </span>
                     <div className="mt-1.5 flex flex-wrap gap-2">
                       {extractedMetadata.tags.map((tag, idx) => (
-                        <TagPill key={idx}>{tag}</TagPill>
+                        <TagPill key={`${tag}-${idx}`}>{tag}</TagPill>
                       ))}
                     </div>
                   </div>
