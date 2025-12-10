@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import type { MultipleChoiceTrivia } from '@aska/shared';
-import MultipleChoiceTriviaCard from '@/components/multiple-choice/MultipleChoiceTriviaCard';
+import MultipleChoiceTriviaListItem from '@/components/multiple-choice/MultipleChoiceTriviaListItem';
+import MultipleChoiceTriviaModal from '@/components/multiple-choice/MultipleChoiceTriviaModal';
 
 type StatusFilter = 'unpublished' | 'published' | 'archived';
 
@@ -12,12 +13,14 @@ export default function MultipleChoiceTriviaListPage(): JSX.Element {
   const [total, setTotal] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('unpublished');
+  const [selectedTrivia, setSelectedTrivia] = useState<MultipleChoiceTrivia | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [stats, setStats] = useState({
     unpublished: 0,
     published: 0,
     archived: 0,
   });
-  const limit = 5;
+  const limit = 20;
   const totalPages = total > 0 ? Math.ceil(total / limit) : 0;
 
   const fetchStats = useCallback(async () => {
@@ -99,8 +102,24 @@ export default function MultipleChoiceTriviaListPage(): JSX.Element {
     // Decrease total - useEffect will handle page adjustment if needed
     setTotal((prev) => prev - 1);
 
+    // Close modal if the deleted item was selected
+    if (selectedTrivia?.id === id) {
+      setIsModalOpen(false);
+      setSelectedTrivia(null);
+    }
+
     // Refresh stats
     fetchStats();
+  };
+
+  const handleItemClick = (trivia: MultipleChoiceTrivia): void => {
+    setSelectedTrivia(trivia);
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = (): void => {
+    setIsModalOpen(false);
+    setSelectedTrivia(null);
   };
 
   const goToPage = (page: number): void => {
@@ -202,14 +221,17 @@ export default function MultipleChoiceTriviaListPage(): JSX.Element {
             </div>
           ) : (
             <>
-              {items.map((trivia) => (
-                <MultipleChoiceTriviaCard
-                  key={trivia.id}
-                  trivia={trivia}
-                  onStatusChange={handleStatusChange}
-                  onDelete={handleDelete}
-                />
-              ))}
+              <div className="space-y-2">
+                {items.map((trivia) => (
+                  <MultipleChoiceTriviaListItem
+                    key={trivia.id}
+                    trivia={trivia}
+                    onStatusChange={handleStatusChange}
+                    onDelete={handleDelete}
+                    onClick={handleItemClick}
+                  />
+                ))}
+              </div>
 
               {/* Pagination */}
               {totalPages > 1 && (
@@ -279,6 +301,15 @@ export default function MultipleChoiceTriviaListPage(): JSX.Element {
             </>
           )}
         </section>
+
+        {/* Modal */}
+        <MultipleChoiceTriviaModal
+          trivia={selectedTrivia}
+          isOpen={isModalOpen}
+          onClose={handleCloseModal}
+          onStatusChange={handleStatusChange}
+          onDelete={handleDelete}
+        />
       </div>
     </div>
   );
