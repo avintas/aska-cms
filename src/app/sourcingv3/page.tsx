@@ -65,6 +65,18 @@ export default function SourcingPageV3(): JSX.Element {
   const [isGeneratingContent, setIsGeneratingContent] = useState(false);
   const [generationResult, setGenerationResult] = useState<ProcessSuitableContentResult | null>(null);
 
+  // Memoize suitable types calculation
+  const suitableTypesInfo = useMemo(() => {
+    if (!suitabilityAnalysis) return null;
+    const suitableTypes = Object.entries(suitabilityAnalysis).filter(
+      ([, analysis]) => analysis && analysis.suitable && analysis.confidence >= 0.7
+    );
+    return {
+      types: suitableTypes,
+      hasSuitableTypes: suitableTypes.length > 0,
+    };
+  }, [suitabilityAnalysis]);
+
   // Check clipboard availability on client side only
   useEffect(() => {
     setHasClipboardAccess(typeof navigator !== 'undefined' && !!navigator.clipboard?.readText);
@@ -204,6 +216,24 @@ export default function SourcingPageV3(): JSX.Element {
     const feedbackState = autoStatus ?? state;
     if (!feedbackState?.recordId || !suitabilityAnalysis) return;
 
+    // Check if there are any suitable types to process
+    const suitableTypes = Object.entries(suitabilityAnalysis).filter(
+      ([, analysis]) => analysis && analysis.suitable && analysis.confidence >= 0.7
+    );
+    
+    if (suitableTypes.length === 0) {
+      // No types meet threshold - shouldn't happen due to UI, but handle gracefully
+      setGenerationResult({
+        success: false,
+        sourceId: feedbackState.recordId,
+        processed: [],
+        skipped: [{ contentType: 'all', reason: 'No content types meet the 70% confidence threshold' }],
+        totalProcessed: 0,
+        totalSkipped: 1,
+      });
+      return;
+    }
+
     setIsGeneratingContent(true);
     setGenerationResult(null);
 
@@ -285,7 +315,7 @@ export default function SourcingPageV3(): JSX.Element {
           <div className="space-y-6">
             <div>
               <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
-                Analyzing content suitability for different content types...
+                Content suitability analysis results. Types with <span className="font-semibold text-emerald-600 dark:text-emerald-400">70%+ confidence</span> will be processed when generating content.
               </p>
             </div>
 
@@ -294,31 +324,75 @@ export default function SourcingPageV3(): JSX.Element {
                 if (!analysis) return null;
                 const isSuitable = analysis.suitable;
                 const confidencePercent = Math.round(analysis.confidence * 100);
+                const meetsThreshold = isSuitable && analysis.confidence >= 0.7;
                 const isShowingReasoning = showReasoning[contentType];
+
+                // Determine color scheme based on suitability and confidence
+                const getCardStyles = () => {
+                  if (meetsThreshold) {
+                    return 'border-emerald-300 bg-emerald-50 dark:border-emerald-900/50 dark:bg-emerald-950/40';
+                  } else if (isSuitable && analysis.confidence >= 0.5) {
+                    return 'border-amber-200 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-950/30';
+                  } else if (isSuitable) {
+                    return 'border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900/50';
+                  } else {
+                    return 'border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900/50 opacity-60';
+                  }
+                };
+
+                const getConfidenceColor = () => {
+                  if (meetsThreshold) {
+                    return 'text-emerald-700 dark:text-emerald-300 font-semibold';
+                  } else if (isSuitable && analysis.confidence >= 0.5) {
+                    return 'text-amber-700 dark:text-amber-300';
+                  } else {
+                    return 'text-slate-500 dark:text-slate-400';
+                  }
+                };
 
                 return (
                   <div
                     key={contentType}
-                    className="rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/50"
+                    className={`rounded-lg border p-4 ${getCardStyles()}`}
                   >
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-3 flex-1">
                         {isSuitable ? (
-                          <span className="text-lg">✓</span>
+                          <span className={`text-lg ${meetsThreshold ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-600 dark:text-slate-400'}`}>✓</span>
                         ) : (
                           <span className="text-lg text-slate-400">✗</span>
                         )}
                         <span className="font-medium text-slate-900 dark:text-slate-100">
                           {formatContentTypeName(contentType)}
                         </span>
-                        <span className="text-xs text-slate-500 dark:text-slate-400">
-                          ({confidencePercent}% confidence)
-                        </span>
+                        <div className="flex items-center gap-2 flex-1">
+                          {/* Confidence Progress Bar */}
+                          <div className="flex-1 max-w-[120px] h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                            <div
+                              className={`h-full transition-all ${
+                                meetsThreshold
+                                  ? 'bg-emerald-500 dark:bg-emerald-400'
+                                  : isSuitable && analysis.confidence >= 0.5
+                                    ? 'bg-amber-500 dark:bg-amber-400'
+                                    : 'bg-slate-400 dark:bg-slate-500'
+                              }`}
+                              style={{ width: `${confidencePercent}%` }}
+                            />
+                          </div>
+                          <span className={`text-xs ${getConfidenceColor()}`}>
+                            {confidencePercent}%
+                          </span>
+                        </div>
+                        {meetsThreshold && (
+                          <span className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-200">
+                            Will Process
+                          </span>
+                        )}
                       </div>
                       <button
                         type="button"
                         onClick={() => toggleReasoning(contentType)}
-                        className="text-xs text-primary-brand hover:text-primary-brand/80"
+                        className="ml-3 text-xs text-primary-brand hover:text-primary-brand/80 shrink-0"
                       >
                         {isShowingReasoning ? 'Hide reasoning' : 'Show reasoning'}
                       </button>
@@ -366,59 +440,77 @@ export default function SourcingPageV3(): JSX.Element {
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-3">
                   Content Suitability:
                 </p>
-                <div className="flex flex-wrap gap-2 mb-4">
-                  {Object.entries(suitabilityAnalysis).map(([contentType, analysis]) => {
-                    if (!analysis || !analysis.suitable || analysis.confidence < 0.7) return null;
-                    return (
-                      <TagPill key={contentType}>{formatContentTypeName(contentType)}</TagPill>
-                    );
-                  })}
-                </div>
-                <PrimaryButton
-                  type="button"
-                  onClick={handleGenerateAllSuitableContent}
-                  disabled={isGeneratingContent || !feedbackState?.recordId}
-                  className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-500/90 dark:hover:bg-emerald-500/90"
-                >
-                  {isGeneratingContent ? 'Generating Content...' : 'Generate All Suitable Content'}
-                </PrimaryButton>
-                {generationResult && (
-                  <div className={`mt-4 rounded-lg border p-3 ${
-                    generationResult.success
-                      ? 'border-emerald-300 bg-emerald-50 dark:border-emerald-900/50 dark:bg-emerald-950/40'
-                      : 'border-red-300 bg-red-50 dark:border-red-900/50 dark:bg-red-950/40'
-                  }`}>
-                    <p className={`text-sm font-medium ${
-                      generationResult.success
-                        ? 'text-emerald-900 dark:text-emerald-100'
-                        : 'text-red-900 dark:text-red-100'
-                    }`}>
-                      {generationResult.success
-                        ? `✅ Generated content for ${generationResult.totalProcessed} content type(s)`
-                        : '❌ Generation failed'}
-                    </p>
-                    {generationResult.processed.length > 0 && (
-                      <div className="mt-2 space-y-1">
-                        {generationResult.processed.map((p, idx) => (
-                          <p key={idx} className="text-xs text-slate-600 dark:text-slate-400">
-                            {p.success ? '✓' : '✗'} {formatContentTypeName(p.contentType)}: {p.message}
-                            {p.itemCount !== undefined && ` (${p.itemCount} items)`}
-                          </p>
-                        ))}
-                      </div>
-                    )}
-                    {generationResult.skipped.length > 0 && (
-                      <div className="mt-2">
-                        <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-                          Skipped ({generationResult.totalSkipped}):
+                {suitableTypesInfo && suitableTypesInfo.hasSuitableTypes ? (
+                  <>
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      {suitableTypesInfo.types.map(([contentType, analysis]) => {
+                        const confidencePercent = Math.round((analysis?.confidence || 0) * 100);
+                        return (
+                          <div key={contentType} className="relative">
+                            <TagPill>{formatContentTypeName(contentType)}</TagPill>
+                            <span className="ml-1 text-xs text-slate-500 dark:text-slate-400">
+                              ({confidencePercent}%)
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <PrimaryButton
+                      type="button"
+                      onClick={handleGenerateAllSuitableContent}
+                      disabled={isGeneratingContent || !feedbackState?.recordId}
+                      className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-500/90 dark:hover:bg-emerald-500/90"
+                    >
+                      {isGeneratingContent ? 'Generating Content...' : `Generate All Suitable Content (${suitableTypesInfo.types.length} type${suitableTypesInfo.types.length !== 1 ? 's' : ''})`}
+                    </PrimaryButton>
+                    {generationResult && (
+                      <div className={`mt-4 rounded-lg border p-3 ${
+                        generationResult.success
+                          ? 'border-emerald-300 bg-emerald-50 dark:border-emerald-900/50 dark:bg-emerald-950/40'
+                          : 'border-red-300 bg-red-50 dark:border-red-900/50 dark:bg-red-950/40'
+                      }`}>
+                        <p className={`text-sm font-medium ${
+                          generationResult.success
+                            ? 'text-emerald-900 dark:text-emerald-100'
+                            : 'text-red-900 dark:text-red-100'
+                        }`}>
+                          {generationResult.success
+                            ? `✅ Generated content for ${generationResult.totalProcessed} content type(s)`
+                            : '❌ Generation failed'}
                         </p>
-                        {generationResult.skipped.map((s, idx) => (
-                          <p key={idx} className="text-xs text-slate-500 dark:text-slate-400">
-                            {formatContentTypeName(s.contentType)}: {s.reason}
-                          </p>
-                        ))}
+                        {generationResult.processed.length > 0 && (
+                          <div className="mt-2 space-y-1">
+                            {generationResult.processed.map((p, idx) => (
+                              <p key={idx} className="text-xs text-slate-600 dark:text-slate-400">
+                                {p.success ? '✓' : '✗'} {formatContentTypeName(p.contentType)}: {p.message}
+                                {p.itemCount !== undefined && ` (${p.itemCount} items)`}
+                              </p>
+                            ))}
+                          </div>
+                        )}
+                        {generationResult.skipped.length > 0 && (
+                          <div className="mt-2">
+                            <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                              Skipped ({generationResult.totalSkipped}):
+                            </p>
+                            {generationResult.skipped.map((s, idx) => (
+                              <p key={idx} className="text-xs text-slate-500 dark:text-slate-400">
+                                {formatContentTypeName(s.contentType)}: {s.reason}
+                              </p>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     )}
+                  </>
+                ) : (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-900/50 dark:bg-amber-950/30 mb-4">
+                    <p className="text-sm text-amber-800 dark:text-amber-200">
+                      ⚠️ No content types meet the 70% confidence threshold for processing.
+                    </p>
+                    <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
+                      Content types with lower confidence scores were identified but won't be automatically generated.
+                    </p>
                   </div>
                 )}
               </div>

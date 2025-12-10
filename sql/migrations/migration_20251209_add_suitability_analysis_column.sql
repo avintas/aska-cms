@@ -9,6 +9,7 @@
 --   {
 --     "multiple_choice_trivia": { "suitable": boolean, "confidence": number, "reasoning": string },
 --     "true_false_trivia": { "suitable": boolean, "confidence": number, "reasoning": string },
+--     "who_am_i_trivia": { "suitable": boolean, "confidence": number, "reasoning": string },
 --     "motivational": { "suitable": boolean, "confidence": number, "reasoning": string },
 --     "facts": { "suitable": boolean, "confidence": number, "reasoning": string },
 --     "wisdom": { "suitable": boolean, "confidence": number, "reasoning": string }
@@ -51,7 +52,7 @@ CREATE INDEX IF NOT EXISTS idx_source_content_ingested_suitability_analysis
 -- ========================================================================
 
 COMMENT ON COLUMN public.source_content_ingested.suitability_analysis IS 
-  'Gemini AI analysis of content suitability for different content types (multiple_choice_trivia, true_false_trivia, motivational, facts, wisdom). Each content type includes suitable (boolean), confidence (0.0-1.0), and reasoning (string) fields.';
+  'Gemini AI analysis of content suitability for different content types (multiple_choice_trivia, true_false_trivia, who_am_i_trivia, motivational, facts, wisdom). Each content type includes suitable (boolean), confidence (0.0-1.0), and reasoning (string) fields.';
 
 -- ========================================================================
 -- VERIFICATION QUERIES (uncomment to run manually)

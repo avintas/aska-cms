@@ -20,6 +20,23 @@ const THEMES = [
 ] as const;
 type ThemeValue = (typeof THEMES)[number];
 
+/**
+ * Get the list of valid themes as a formatted string for prompts
+ */
+export function getValidThemesList(): string {
+  return THEMES.join(', ');
+}
+
+/**
+ * Get the list of valid themes with categories for prompts
+ */
+export function getValidThemesWithCategories(): string {
+  return THEMES.map((theme) => {
+    const categories = CATEGORY_BY_THEME[theme];
+    return `- ${theme}${categories.length > 0 ? ` (Categories: ${categories.join(', ')})` : ''}`;
+  }).join('\n');
+}
+
 const CATEGORY_BY_THEME: Record<ThemeValue, readonly string[]> = {
   Players: [
     'Player Spotlight',
@@ -146,23 +163,53 @@ export function validateExtractedMetadata(input: unknown): {
   const errors: string[] = [];
   const obj = input as Record<string, unknown>;
 
-  const theme = obj?.theme as string | undefined;
+  const themeRaw = obj?.theme as string | undefined;
+  const theme = themeRaw?.trim();
   const tags = obj?.tags as unknown;
   const category = (obj?.category as string | null | undefined) ?? null;
   const summary = coerceSummary(obj);
 
-  if (!theme || !THEMES.includes(theme as ThemeValue)) {
-    errors.push('theme must be one of the 13 standardized themes');
+  if (!theme) {
+    errors.push(`theme is required. Valid themes are: ${THEMES.join(', ')}`);
+  } else {
+    // Normalize common variations before matching
+    const normalizeTheme = (t: string): string => {
+      return t
+        .replace(/\s*&\s*/g, ' and ') // Replace "&" with "and"
+        .replace(/\s+/g, ' ') // Normalize whitespace
+        .trim();
+    };
+
+    const normalizedTheme = normalizeTheme(theme);
+    
+    // Try case-insensitive matching with normalized version
+    const matchedTheme = THEMES.find((t) => {
+      const normalizedT = normalizeTheme(t);
+      return normalizedT.toLowerCase() === normalizedTheme.toLowerCase();
+    });
+
+    if (!matchedTheme) {
+      errors.push(
+        `theme "${theme}" is not valid. Must be one of these 13 standardized themes: ${THEMES.join(', ')}`
+      );
+    } else if (matchedTheme !== theme) {
+      // Theme matched but with variation (case, & vs and, etc.) - auto-fix
+      (obj as Record<string, unknown>).theme = matchedTheme;
+    }
   }
   if (!Array.isArray(tags) || tags.length < 1 || tags.some((t) => typeof t !== 'string')) {
     errors.push('tags must be a non-empty array of strings');
   }
   if (category !== null && typeof category === 'string') {
-    const t = theme as ThemeValue;
+    // Use the matched theme (correctly cased) if we found one
+    const themeToCheck = (theme && THEMES.find((t) => t.toLowerCase() === theme.toLowerCase())) || theme;
+    const t = themeToCheck as ThemeValue;
     if (THEMES.includes(t)) {
       const allowed = CATEGORY_BY_THEME[t];
       if (!allowed.includes(category)) {
-        errors.push('category must be one of the allowed values for the selected theme');
+        errors.push(
+          `category "${category}" is not valid for theme "${t}". Valid categories: ${allowed.join(', ')}`
+        );
       }
     }
   } else if (category !== null) {
@@ -176,11 +223,21 @@ export function validateExtractedMetadata(input: unknown): {
     return { valid: false, errors };
   }
 
+  // Get the correctly cased theme (either original or auto-corrected)
+  const finalTheme = (obj.theme as string)?.trim() as ThemeValue;
+  if (!THEMES.includes(finalTheme)) {
+    // This shouldn't happen, but double-check
+    return {
+      valid: false,
+      errors: [`Theme validation failed. Received: "${finalTheme}". Valid themes: ${THEMES.join(', ')}`],
+    };
+  }
+
   return {
     valid: true,
     errors: [],
     value: {
-      theme: theme as ThemeValue,
+      theme: finalTheme,
       tags: tags as string[],
       category,
       summary: summary!,

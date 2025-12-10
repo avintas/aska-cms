@@ -1,7 +1,9 @@
 'use client';
 
+import { useState, useRef, useEffect } from 'react';
 import type { TrueFalseTrivia } from '@aska/shared';
 import { StatusBadge } from '@/components/ui/CollectionList';
+import TrueFalseMiniPlayer from './TrueFalseMiniPlayer';
 
 interface TrueFalseTriviaCardProps {
   trivia: TrueFalseTrivia;
@@ -31,6 +33,9 @@ export default function TrueFalseTriviaCard({
   onStatusChange,
   onDelete,
 }: TrueFalseTriviaCardProps): JSX.Element {
+  const [isTestModalOpen, setIsTestModalOpen] = useState(false);
+  const modalRef = useRef<HTMLDivElement>(null);
+
   const questionWordCount = countWords(trivia.question_text);
   const questionCharCount = countCharacters(trivia.question_text);
   const explanationWordCount = trivia.explanation ? countWords(trivia.explanation) : 0;
@@ -38,6 +43,27 @@ export default function TrueFalseTriviaCard({
 
   const totalCharCount = questionCharCount + explanationCharCount;
   const totalWordCount = questionWordCount + explanationWordCount;
+
+  // Close modal on Escape key
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape' && isTestModalOpen) {
+        setIsTestModalOpen(false);
+      }
+    };
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [isTestModalOpen]);
+
+  // Focus management for modal
+  useEffect(() => {
+    if (isTestModalOpen && modalRef.current) {
+      const focusable = modalRef.current.querySelector(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+      ) as HTMLElement;
+      focusable?.focus();
+    }
+  }, [isTestModalOpen]);
 
   // Copy trivia to clipboard
   const handleCopy = async (): Promise<void> => {
@@ -105,6 +131,18 @@ export default function TrueFalseTriviaCard({
       console.error('Failed to delete:', error);
       alert('Failed to delete trivia');
     }
+  };
+
+  // Handle approve from Mini-Player
+  const handleApprove = async (): Promise<void> => {
+    setIsTestModalOpen(false);
+    await handleStatusChange('published');
+  };
+
+  // Handle reject from Mini-Player
+  const handleReject = async (): Promise<void> => {
+    setIsTestModalOpen(false);
+    await handleStatusChange('archived');
   };
 
   // Determine status
@@ -178,6 +216,16 @@ export default function TrueFalseTriviaCard({
 
       {/* Divider and Action Buttons */}
       <div className="flex items-center gap-2 flex-wrap border-t border-gray-200 pt-3 dark:border-slate-800">
+        {/* Test Button */}
+        <button
+          type="button"
+          onClick={() => setIsTestModalOpen(true)}
+          className="px-2 py-1 text-xs font-medium text-indigo-700 bg-indigo-50 rounded hover:bg-indigo-100 transition-colors dark:bg-indigo-950/40 dark:text-indigo-300 dark:hover:bg-indigo-950/60"
+          title="Test this question"
+        >
+          🎮 Test
+        </button>
+
         {/* Copy Button */}
         <button
           type="button"
@@ -244,6 +292,49 @@ export default function TrueFalseTriviaCard({
           🗑️ Delete
         </button>
       </div>
+
+      {/* Test Modal */}
+      {isTestModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 px-4 backdrop-blur-sm">
+          <div
+            ref={modalRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="test-modal-title"
+            className="flex w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-950/90"
+          >
+            {/* Modal Header */}
+            <header className="flex items-center justify-between border-b border-slate-200 px-6 py-4 dark:border-slate-800">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.35em] text-slate-500 dark:text-slate-400">
+                  Trivia Test Bench
+                </p>
+                <h2 id="test-modal-title" className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                  Test True/False Question
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsTestModalOpen(false)}
+                className="rounded-lg px-3 py-1.5 text-sm font-medium text-gray-700 transition hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-slate-800"
+                aria-label="Close modal"
+              >
+                ✕
+              </button>
+            </header>
+
+            {/* Modal Content */}
+            <div className="overflow-y-auto px-6 py-6">
+              <TrueFalseMiniPlayer
+                trivia={trivia}
+                onApprove={handleApprove}
+                onReject={handleReject}
+                showApprovalButtons={true}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

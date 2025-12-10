@@ -6,6 +6,8 @@ import {
   validateEnrichedContent,
   validateExtractedMetadata,
   validateContentSuitabilityAnalysis,
+  getValidThemesList,
+  getValidThemesWithCategories,
   type EnrichedContent,
   type ExtractedMetadata,
   type ContentSuitabilityAnalysis,
@@ -20,7 +22,23 @@ export async function extractMetadata(
   promptContent: string,
 ): Promise<{ success: true; data: ExtractedMetadata } | { success: false; error: string }> {
   try {
-    const fullPrompt = `${promptContent.trim()}
+    // Ensure the prompt includes valid themes - append if not already present
+    const themesList = getValidThemesList();
+    const themesSection = `\n\n## Valid Themes (REQUIRED - must use exact spelling):
+You MUST select one of these 13 standardized themes (use exact spelling and capitalization):
+${getValidThemesWithCategories()}
+
+IMPORTANT: The theme field must match one of the themes above EXACTLY (including capitalization and punctuation).`;
+
+    // Check if prompt already mentions themes to avoid duplication
+    // Look for indicators that themes are already listed
+    const promptLower = promptContent.toLowerCase();
+    const hasThemesInfo = 
+      (promptLower.includes('theme') && promptLower.includes('standardized')) ||
+      (promptLower.includes('13 standardized themes') || promptLower.includes('13 themes')) ||
+      (promptLower.includes('players') && promptLower.includes('teams & organizations') && promptLower.includes('venues & locations'));
+
+    const fullPrompt = `${promptContent.trim()}${hasThemesInfo ? '' : themesSection}
 
 Source Content:
 ${processedText}`;
@@ -45,8 +63,33 @@ ${processedText}`;
 
     const json = cleanJsonString(text);
     const parsed = JSON.parse(json) as unknown;
+    
+    // Log what Gemini generated for debugging
+    // eslint-disable-next-line no-console
+    console.log('Gemini extracted metadata (raw):', JSON.stringify(parsed, null, 2));
+    
     const { valid, errors, value } = validateExtractedMetadata(parsed);
     if (!valid || !value) {
+      // eslint-disable-next-line no-console
+      console.error('Metadata validation failed:', {
+        errors,
+        receivedTheme: (parsed as Record<string, unknown>)?.theme,
+        validThemes: [
+          'Players',
+          'Teams & Organizations',
+          'Venues & Locations',
+          'Awards & Honors',
+          'Leadership & Staff',
+          'Business & Finance',
+          'Media, Broadcasting, & E-Sports',
+          'Marketing, Sponsorship, and Merchandising',
+          'Equipment & Technology',
+          'Training, Health, & Wellness',
+          'Fandom & Fan Culture',
+          'Social Impact & Diversity',
+          'Tactics & Advanced Analytics',
+        ],
+      });
       return { success: false, error: `AI output validation failed: ${errors.join('; ')}` };
     }
     return { success: true, data: value };
