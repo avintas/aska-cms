@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { gemini } from '../client';
 import type { TriviaQuestion } from '@/lib/types';
-import { cleanJsonString } from '@/lib/content-helpers';
+import { cleanJsonString, parseJsonWithRepair } from '@/lib/content-helpers';
 import { handleGeminiError } from '../error-handler';
 
 export interface WhoAmIGenerationRequest {
@@ -46,8 +46,18 @@ export async function generateWhoAmI(
       return { success: false, error: 'Gemini returned an empty response.' };
     }
 
-    const cleanText = cleanJsonString(text);
-    const parsedResponse = JSON.parse(cleanText);
+    // Use improved JSON parsing with repair attempts
+    const parseResult = parseJsonWithRepair(text);
+    if (!parseResult.success) {
+      // eslint-disable-next-line no-console
+      console.error('JSON parse error in Who Am I generation:', parseResult.error);
+      return {
+        success: false,
+        error: `Failed to parse AI response: ${parseResult.error}`,
+      };
+    }
+
+    const parsedResponse = parseResult.data as { items?: unknown[] };
     if (!parsedResponse || !Array.isArray(parsedResponse.items)) {
       return {
         success: false,

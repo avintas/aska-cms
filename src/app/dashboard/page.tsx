@@ -28,6 +28,11 @@ import {
 
 const actionItems = [
   {
+    title: 'Sourcing',
+    href: '/sourcing',
+    icon: <SourcingIcon className="h-10 w-10 text-primary-brand" />,
+  },
+  {
     title: 'Wisdom',
     href: '/wisdom',
     icon: <WisdomIcon className="h-10 w-10 text-primary-brand" />,
@@ -71,11 +76,6 @@ const actionItems = [
     title: 'Publishing',
     href: '/publishing',
     icon: <PublishingIcon className="h-10 w-10 text-primary-brand" />,
-  },
-  {
-    title: 'Sourcing',
-    href: '/sourcing',
-    icon: <SourcingIcon className="h-10 w-10 text-primary-brand" />,
   },
   {
     title: 'Stats',

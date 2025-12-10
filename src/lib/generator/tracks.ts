@@ -190,9 +190,8 @@ function normalizeMotivationalItem(item: Record<string, unknown>, _sourceId?: nu
   }
   return {
     quote,
-    // Note: author field removed - database schema does not have author column
+    // Note: author and context fields removed - database schema does not have these columns
     // Attribution can be used instead if author information is needed
-    context: coerceNullableString(item.context) ?? coerceNullableString(item.explanation),
     theme: coerceNullableString(item.theme),
     category: coerceNullableString(item.category),
     attribution: coerceNullableString(item.author) ?? coerceNullableString(item.attribution),

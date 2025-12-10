@@ -4,7 +4,8 @@ import { createServerClient } from '@/utils/supabase/server';
 import { randomUUID } from 'crypto';
 import { processText } from '@/lib/text-processing';
 import { getActivePromptByType } from '@/lib/prompts/repository';
-import { extractMetadata, enrichContent } from '@/lib/sourcing/adapters';
+import { extractMetadata, enrichContent, analyzeContentSuitability } from '@/lib/sourcing/adapters';
+import type { ContentSuitabilityAnalysis } from '@/lib/sourcing/validators';
 
 export interface IngestState {
   ok: boolean;
@@ -20,6 +21,7 @@ export interface IngestState {
     wordCount: number;
     charCount: number;
     keyPhrases?: string[];
+    suitabilityAnalysis?: ContentSuitabilityAnalysis;
   };
 }
 
@@ -68,10 +70,40 @@ async function runIngestionPipeline({ raw, titleOverride }: PipelineInput): Prom
       return { ok: false, error: enr.error };
     }
 
+    // Run content suitability analysis (non-blocking - if it fails, ingestion still succeeds)
+    let suitabilityAnalysis: ContentSuitabilityAnalysis | undefined;
+    try {
+      const analysisPrompt = await getActivePromptByType('content_suitability_analysis');
+      if (analysisPrompt) {
+        const analysis = await analyzeContentSuitability(processedText, analysisPrompt.prompt_content);
+        if (analysis.success && analysis.data) {
+          suitabilityAnalysis = analysis.data;
+          // eslint-disable-next-line no-console
+          console.log('Content suitability analysis completed successfully:', Object.keys(suitabilityAnalysis));
+        } else {
+          // eslint-disable-next-line no-console
+          console.warn('Content suitability analysis returned unsuccessful:', analysis.error);
+        }
+      } else {
+        // eslint-disable-next-line no-console
+        console.warn('No content suitability analysis prompt found - skipping analysis');
+      }
+    } catch (analysisError) {
+      // Log but don't fail ingestion
+      // eslint-disable-next-line no-console
+      console.warn('Content suitability analysis failed:', analysisError);
+    }
+
     const supabase = await createServerClient();
     const ingestion_process_id = randomUUID();
 
-    const insertPayload = {
+    // Build metadata object (without suitability_analysis - it goes in its own column)
+    const metadataObj: Record<string, unknown> = {
+      key_phrases: enr.data.key_phrases,
+    };
+
+    // Build insert payload with suitability_analysis as a separate column
+    const insertPayload: Record<string, unknown> = {
       content_text: processedText,
       word_count: processed.wordCount,
       char_count: processed.charCount,
@@ -81,19 +113,59 @@ async function runIngestionPipeline({ raw, titleOverride }: PipelineInput): Prom
       summary: meta.data.summary,
       title: enr.data.title,
       key_phrases: enr.data.key_phrases,
-      metadata: { key_phrases: enr.data.key_phrases },
+      metadata: metadataObj,
       ingestion_process_id,
       ingestion_status: 'complete',
     };
 
+    // Add suitability_analysis to the insert payload if it exists
+    if (suitabilityAnalysis && Object.keys(suitabilityAnalysis).length > 0) {
+      insertPayload.suitability_analysis = suitabilityAnalysis;
+      // eslint-disable-next-line no-console
+      console.log('Including suitability analysis in insert payload. Content types:', Object.keys(suitabilityAnalysis));
+      // eslint-disable-next-line no-console
+      console.log('Full analysis data:', JSON.stringify(suitabilityAnalysis, null, 2));
+    } else {
+      // eslint-disable-next-line no-console
+      console.warn('No suitability analysis to save - analysis was not completed or is empty');
+      // eslint-disable-next-line no-console
+      console.warn('suitabilityAnalysis value:', suitabilityAnalysis);
+    }
+
+    // eslint-disable-next-line no-console
+    console.log('Inserting payload with suitability_analysis:', insertPayload.suitability_analysis ? 'YES' : 'NO');
+
     const { data, error } = await supabase
       .from('source_content_ingested')
       .insert(insertPayload)
-      .select('id')
+      .select('id, metadata, suitability_analysis')
       .single();
 
     if (error) {
+      // eslint-disable-next-line no-console
+      console.error('Database insert error:', error);
       return { ok: false, error: error.message || 'Failed to save ingested content.' };
+    }
+
+    // Verify what was actually saved
+    const savedSuitabilityAnalysis = data?.suitability_analysis as ContentSuitabilityAnalysis | null;
+    if (suitabilityAnalysis && Object.keys(suitabilityAnalysis).length > 0) {
+      if (savedSuitabilityAnalysis) {
+        // eslint-disable-next-line no-console
+        console.log('✅ Suitability analysis WAS saved to database column');
+        // eslint-disable-next-line no-console
+        console.log('Saved analysis content types:', Object.keys(savedSuitabilityAnalysis));
+      } else {
+        // eslint-disable-next-line no-console
+        console.error('❌ Suitability analysis was NOT saved to database column, even though it was included in insertPayload');
+        // eslint-disable-next-line no-console
+        console.error('Expected analysis:', JSON.stringify(suitabilityAnalysis, null, 2));
+        // eslint-disable-next-line no-console
+        console.error('Actual saved analysis:', savedSuitabilityAnalysis);
+      }
+    } else {
+      // eslint-disable-next-line no-console
+      console.log('No suitability analysis to verify (analysis was not completed or is empty)');
     }
 
     return {
@@ -108,6 +180,7 @@ async function runIngestionPipeline({ raw, titleOverride }: PipelineInput): Prom
         wordCount: processed.wordCount,
         charCount: processed.charCount,
         keyPhrases: enr.data.key_phrases,
+        suitabilityAnalysis,
       },
     };
   } catch (err) {
