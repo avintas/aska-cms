@@ -58,6 +58,7 @@ export interface SourceMultipleChoiceQuestion {
   tags: string[] | null;
   attribution: string | null;
   status: string;
+  global_usage_count: number; // Number of times this question has been used in sets
   created_at: string;
   updated_at: string;
   published_at: string | null;

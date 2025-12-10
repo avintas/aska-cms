@@ -14,6 +14,29 @@ export const queryQuestionsTask: ProcessBuilderTask = {
 
   async execute(context: TaskContext): Promise<TaskResult> {
     try {
+      // Check if pre-selected candidates are provided (for automated builds)
+      const preSelectedCandidates = context.options?.preSelectedCandidates as
+        | SourceMultipleChoiceQuestion[]
+        | undefined;
+
+      if (preSelectedCandidates && Array.isArray(preSelectedCandidates)) {
+        // Use pre-selected candidates (already filtered and sorted by usage)
+        const questionCountRule = context.rules.questionCount;
+        const questionCount = (questionCountRule?.value as number) || preSelectedCandidates.length;
+
+        return {
+          success: true,
+          data: { candidates: preSelectedCandidates },
+          metadata: {
+            candidateCount: preSelectedCandidates.length,
+            requestedCount: questionCount,
+            totalCandidates: preSelectedCandidates.length,
+            usingPreSelected: true,
+          },
+        };
+      }
+
+      // Standard query flow (manual builds)
       const supabase = getSupabaseAdmin();
 
       // Extract theme from goal
