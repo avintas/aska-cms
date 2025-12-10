@@ -22,7 +22,7 @@ export default function AutomatedSetBuilderClient({
   initialConfig,
 }: AutomatedSetBuilderClientProps): JSX.Element {
   const [triviaType, setTriviaType] = useState<TriviaTypeOption>('mc');
-  const [numberOfSets, setNumberOfSets] = useState(5);
+  const [numberOfSets, setNumberOfSets] = useState(1);
   const [questionsPerSet, setQuestionsPerSet] = useState(initialConfig?.questions_per_set ?? 10);
   const [selectedThemes, setSelectedThemes] = useState<string[]>(
     initialConfig?.themes ?? AVAILABLE_THEMES,

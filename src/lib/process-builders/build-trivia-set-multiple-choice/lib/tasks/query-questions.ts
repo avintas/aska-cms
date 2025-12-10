@@ -70,43 +70,96 @@ export const queryQuestionsTask: ProcessBuilderTask = {
 
       const questionCount = questionCountRule.value as number;
 
-      // Build query
-      let query = supabase
+      // Build base query (without limit to get count first)
+      let countQuery = supabase
         .from('trivia_multiple_choice')
-        .select('*')
+        .select('*', { count: 'exact', head: true })
         .eq('status', 'published'); // Only published questions
 
       // Filter by theme if provided
       if (theme) {
-        query = query.ilike('theme', `%${theme}%`);
+        countQuery = countQuery.ilike('theme', `%${theme}%`);
       }
 
-        // Optional filters from rules
-        if (context.rules.category) {
-          const category = context.rules.category.value as string;
-          query = query.eq('category', category);
-        }
+      // Optional filters from rules
+      if (context.rules.category) {
+        const category = context.rules.category.value as string;
+        countQuery = countQuery.eq('category', category);
+      }
 
-        // Note: Difficulty filtering removed - all difficulties are included
+      // Get total count first
+      const { count: totalCount, error: countError } = await countQuery;
 
-      // Execute query to get all candidates
-      const { data, error } = await query;
-
-      if (error) {
+      if (countError) {
         return {
           success: false,
           errors: [
             {
               code: 'DATABASE_ERROR',
-              message: `Failed to query questions: ${error.message}`,
+              message: `Failed to count questions: ${countError.message}`,
               taskId: 'query-questions',
-              details: error,
+              details: countError,
             },
           ],
         };
       }
 
-      const candidates = (data || []) as SourceMultipleChoiceQuestion[];
+      const totalQuestions = totalCount || 0;
+
+      // Fetch ALL questions in batches to ensure we get everything
+      // Supabase has a default limit of 1000 rows per query, so we need to paginate
+      // This ensures random selection works across ALL matching questions, not just the first 1000
+      const batchSize = 1000;
+      const allCandidates: SourceMultipleChoiceQuestion[] = [];
+      let offset = 0;
+
+      while (offset < totalQuestions) {
+        // Build query for this batch
+        let batchQuery = supabase
+          .from('trivia_multiple_choice')
+          .select('*')
+          .eq('status', 'published')
+          .range(offset, offset + batchSize - 1);
+
+        // Apply same filters
+        if (theme) {
+          batchQuery = batchQuery.ilike('theme', `%${theme}%`);
+        }
+
+        if (context.rules.category) {
+          const category = context.rules.category.value as string;
+          batchQuery = batchQuery.eq('category', category);
+        }
+
+        const { data: batchData, error: batchError } = await batchQuery;
+
+        if (batchError) {
+          return {
+            success: false,
+            errors: [
+              {
+                code: 'DATABASE_ERROR',
+                message: `Failed to fetch questions batch: ${batchError.message}`,
+                taskId: 'query-questions',
+                details: batchError,
+              },
+            ],
+          };
+        }
+
+        if (batchData && batchData.length > 0) {
+          allCandidates.push(...(batchData as SourceMultipleChoiceQuestion[]));
+        }
+
+        // If we got fewer than batchSize, we've reached the end
+        if (!batchData || batchData.length < batchSize) {
+          break;
+        }
+
+        offset += batchSize;
+      }
+
+      const candidates = allCandidates;
       const totalCandidates = candidates.length;
 
       // Check if we have enough candidates

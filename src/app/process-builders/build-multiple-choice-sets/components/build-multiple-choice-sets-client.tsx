@@ -20,7 +20,7 @@ const AVAILABLE_THEMES = [
 ];
 
 export default function BuildMultipleChoiceSetsClient(): JSX.Element {
-  const [numberOfSets, setNumberOfSets] = useState(5);
+  const [numberOfSets, setNumberOfSets] = useState(1);
   const [questionsPerSet, setQuestionsPerSet] = useState(10);
   const [selectedThemes, setSelectedThemes] = useState<string[]>(AVAILABLE_THEMES);
   const [balanceThemes, setBalanceThemes] = useState(true);
@@ -91,7 +91,7 @@ export default function BuildMultipleChoiceSetsClient(): JSX.Element {
         description="Create multiple choice trivia sets with custom configuration. Each set will be stored as a separate record in collection_trivia_sets."
       >
         <div className="mt-6 space-y-8">
-          {/* Number of Sets */}
+          {/* Number of Sets - Hidden by default, but kept for flexibility */}
           <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900/70">
             <label className="block text-sm font-semibold text-slate-900 dark:text-slate-100 mb-2">
               Number of Sets to Build
@@ -99,13 +99,15 @@ export default function BuildMultipleChoiceSetsClient(): JSX.Element {
             <input
               type="number"
               min="1"
-              max="100"
+              max="10"
               value={numberOfSets}
               onChange={(e) => setNumberOfSets(parseInt(e.target.value, 10) || 1)}
               className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2 text-slate-900 focus:border-primary-brand focus:outline-none focus:ring-2 focus:ring-primary-brand/20 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
             />
             <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-              Each set will be created as a separate record in the database.
+              {numberOfSets === 1
+                ? 'Building one set at a time allows for better quality control and review.'
+                : 'Each set will be created as a separate record in the database.'}
             </p>
           </div>
 
@@ -196,7 +198,13 @@ export default function BuildMultipleChoiceSetsClient(): JSX.Element {
               onClick={handleBuildSets}
               disabled={isBuilding || numberOfSets < 1 || questionsPerSet < 1}
             >
-              {isBuilding ? 'Building Sets...' : `Build ${numberOfSets} Set(s)`}
+              {isBuilding
+                ? numberOfSets === 1
+                  ? 'Building Set...'
+                  : 'Building Sets...'
+                : numberOfSets === 1
+                  ? 'Build Set'
+                  : `Build ${numberOfSets} Sets`}
             </PrimaryButton>
           </div>
 
