@@ -31,16 +31,17 @@ export interface CollectionTriviaSetEntry {
 /**
  * A single trivia set record in collection_trivia_sets table
  * One row per trivia set (not grouped by publish_date)
+ * The sets column contains a JSONB array with one element: [{type: "mc", set: {...}}]
  */
 export interface CollectionTriviaSet {
   /** Primary key */
   id: number;
   /** The date this set is scheduled to publish (ISO date string) */
   publish_date: string;
-  /** Type of trivia set: 'mc', 'tf', or 'wai' */
-  set_type: TriviaSetType;
-  /** Complete trivia set object stored as JSONB */
-  set_data: MultipleChoiceTriviaSet | TrueFalseTriviaSet;
+  /** Array of trivia sets stored as JSONB (contains one set per record) */
+  sets: CollectionTriviaSetEntry[];
+  /** Number of sets in the collection (always 1 for individual records) */
+  set_count: number;
   /** Status of the automated run that created this set */
   run_status: 'completed' | 'partial' | 'failed';
   /** Message about the run (success message or error) */
@@ -56,8 +57,8 @@ export interface CollectionTriviaSet {
  */
 export interface CollectionTriviaSetCreateInput {
   publish_date: string;
-  set_type: TriviaSetType;
-  set_data: MultipleChoiceTriviaSet | TrueFalseTriviaSet;
+  sets: CollectionTriviaSetEntry[]; // Array with one element: [{type: "mc", set: {...}}]
+  set_count?: number; // Defaults to 1
   run_status?: 'completed' | 'partial' | 'failed';
   run_message?: string | null;
 }
@@ -65,13 +66,13 @@ export interface CollectionTriviaSetCreateInput {
 /**
  * Collection of trivia sets for a single publish date
  * Used for querying/displaying sets grouped by date
- * @deprecated This is now a query result, not a table structure
+ * This is a query result that groups individual set records by publish_date
  */
 export interface CollectionTriviaSets {
   /** The date these sets are scheduled to publish (ISO date string) */
   publish_date: string;
-  /** Array of trivia set records */
-  sets: CollectionTriviaSet[];
+  /** Array of trivia set entries (extracted from individual records) */
+  sets: CollectionTriviaSetEntry[];
   /** Number of sets in the collection */
   set_count: number;
 }

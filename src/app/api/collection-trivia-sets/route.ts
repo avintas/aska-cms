@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/utils/supabase/admin';
-import type { CollectionTriviaSets, CollectionTriviaSet } from '@/shared/types/automated-set-builder';
+import type {
+  CollectionTriviaSets,
+  CollectionTriviaSet,
+  CollectionTriviaSetEntry,
+} from '@/shared/types/automated-set-builder';
 
 /**
  * GET /api/collection-trivia-sets
@@ -46,24 +50,26 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     }
 
     // Group sets by publish_date
-    const groupedByDate = new Map<string, CollectionTriviaSet[]>();
+    // Each database row has a sets JSONB array with one element: [{type: "mc", set: {...}}]
+    const groupedByDate = new Map<string, CollectionTriviaSetEntry[]>();
     
-    (data as CollectionTriviaSet[] || []).forEach((set) => {
-      const date = set.publish_date;
-      if (!groupedByDate.has(date)) {
-        groupedByDate.set(date, []);
+    (data as CollectionTriviaSet[] || []).forEach((row) => {
+      const date = row.publish_date;
+      // Extract the set entry from the sets array (each row has one set in the array)
+      if (row.sets && Array.isArray(row.sets) && row.sets.length > 0) {
+        const setEntry = row.sets[0]; // First (and only) element in the array
+        if (!groupedByDate.has(date)) {
+          groupedByDate.set(date, []);
+        }
+        groupedByDate.get(date)!.push(setEntry);
       }
-      groupedByDate.get(date)!.push(set);
     });
 
     // Convert to CollectionTriviaSets format (grouped by date)
     const collections: CollectionTriviaSets[] = Array.from(groupedByDate.entries()).map(
       ([publish_date, sets]) => ({
         publish_date,
-        sets: sets.map((set) => ({
-          type: set.set_type,
-          set: set.set_data,
-        })),
+        sets: sets, // Already in the correct format: CollectionTriviaSetEntry[]
         set_count: sets.length,
       }),
     );
@@ -90,4 +96,3 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     );
   }
 }
-

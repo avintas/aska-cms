@@ -212,7 +212,7 @@ export default function CollectionTriviaSetsClient(): JSX.Element {
                                           <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
                                             {qIndex + 1}. {q.question_text}
                                           </p>
-                                          {setEntry.type === 'mc' && (
+                                          {setEntry.type === 'mc' && q.question_type === 'multiple-choice' && (
                                             <div className="mt-2 space-y-1">
                                               <p className="text-xs text-emerald-600 dark:text-emerald-400">
                                                 ✓ {q.correct_answer}
