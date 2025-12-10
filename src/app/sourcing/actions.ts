@@ -76,7 +76,7 @@ async function runIngestionPipeline({ raw, titleOverride }: PipelineInput): Prom
       const analysisPrompt = await getActivePromptByType('content_suitability_analysis');
       if (analysisPrompt) {
         const analysis = await analyzeContentSuitability(processedText, analysisPrompt.prompt_content);
-        if (analysis.success && analysis.data) {
+        if (analysis.success) {
           suitabilityAnalysis = analysis.data;
           // eslint-disable-next-line no-console
           console.log('Content suitability analysis completed successfully:', Object.keys(suitabilityAnalysis));
