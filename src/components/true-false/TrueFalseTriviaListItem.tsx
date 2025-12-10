@@ -1,21 +1,21 @@
 'use client';
 
-import type { MultipleChoiceTrivia } from '@aska/shared';
+import type { TrueFalseTrivia } from '@aska/shared';
 import { StatusBadge } from '@/components/ui/CollectionList';
 
-interface MultipleChoiceTriviaListItemProps {
-  trivia: MultipleChoiceTrivia;
+interface TrueFalseTriviaListItemProps {
+  trivia: TrueFalseTrivia;
   onStatusChange?: (id: number, newStatus: string) => void;
   onDelete?: (id: number) => void;
-  onClick?: (trivia: MultipleChoiceTrivia) => void;
+  onClick?: (trivia: TrueFalseTrivia) => void;
 }
 
-export default function MultipleChoiceTriviaListItem({
+export default function TrueFalseTriviaListItem({
   trivia,
   onStatusChange,
   onDelete,
   onClick,
-}: MultipleChoiceTriviaListItemProps): JSX.Element {
+}: TrueFalseTriviaListItemProps): JSX.Element {
   // Handle status change (publish/unpublish/archive)
   const handleStatusChange = async (
     e: React.MouseEvent<HTMLButtonElement>,
@@ -25,7 +25,7 @@ export default function MultipleChoiceTriviaListItem({
     if (!onStatusChange) return;
 
     try {
-      const response = await fetch(`/api/multiple-choice/${trivia.id}`, {
+      const response = await fetch(`/api/true-false/${trivia.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus }),
@@ -62,7 +62,7 @@ export default function MultipleChoiceTriviaListItem({
     }
 
     try {
-      const response = await fetch(`/api/multiple-choice/${trivia.id}`, {
+      const response = await fetch(`/api/true-false/${trivia.id}`, {
         method: 'DELETE',
       });
 
@@ -108,6 +108,15 @@ export default function MultipleChoiceTriviaListItem({
             {trivia.theme && (
               <span className="text-xs text-gray-500 dark:text-gray-400">• {trivia.theme}</span>
             )}
+            <span
+              className={`text-xs font-medium ${
+                trivia.is_true
+                  ? 'text-green-700 dark:text-green-400'
+                  : 'text-red-700 dark:text-red-400'
+              }`}
+            >
+              • {trivia.is_true ? 'TRUE' : 'FALSE'}
+            </span>
           </div>
           <p className="text-sm text-gray-900 leading-relaxed dark:text-gray-100">
             {questionPreview}
@@ -179,6 +188,4 @@ export default function MultipleChoiceTriviaListItem({
     </div>
   );
 }
-
-
 

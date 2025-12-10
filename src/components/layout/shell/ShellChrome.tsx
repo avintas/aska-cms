@@ -78,11 +78,6 @@ export default function ShellChrome({ children, userEmail }: ShellChromeProps): 
             description: 'Ingest and orchestrate source content.',
           },
           {
-            label: 'Content Browser',
-            href: '/content-browser',
-            description: 'Explore ingested source catalog.',
-          },
-          {
             label: 'Source Content Updater',
             href: '/source-content-updater',
             description: 'Refresh metadata for ingested source content.',

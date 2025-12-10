@@ -1,24 +1,24 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import type { MultipleChoiceTrivia } from '@aska/shared';
+import type { WhoAmITrivia } from '@aska/shared';
 import { StatusBadge } from '@/components/ui/CollectionList';
 
-interface MultipleChoiceTriviaModalProps {
-  trivia: MultipleChoiceTrivia | null;
+interface WhoAmITriviaModalProps {
+  trivia: WhoAmITrivia | null;
   isOpen: boolean;
   onClose: () => void;
   onStatusChange?: (id: number, newStatus: string) => void;
   onDelete?: (id: number) => void;
 }
 
-export default function MultipleChoiceTriviaModal({
+export default function WhoAmITriviaModal({
   trivia,
   isOpen,
   onClose,
   onStatusChange,
   onDelete,
-}: MultipleChoiceTriviaModalProps): JSX.Element | null {
+}: WhoAmITriviaModalProps): JSX.Element | null {
   const modalRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -88,10 +88,7 @@ export default function MultipleChoiceTriviaModal({
   // Copy trivia to clipboard
   const handleCopy = async (): Promise<void> => {
     try {
-      let textToCopy = `Question: ${trivia.question_text}\nCorrect Answer: ${trivia.correct_answer}`;
-      if (trivia.wrong_answers && trivia.wrong_answers.length > 0) {
-        textToCopy = `${textToCopy}\nWrong Answers: ${trivia.wrong_answers.join(', ')}`;
-      }
+      let textToCopy = `Question: ${trivia.question_text}\nAnswer: ${trivia.correct_answer}`;
       if (trivia.explanation) {
         textToCopy = `${textToCopy}\nExplanation: ${trivia.explanation}`;
       }
@@ -108,7 +105,7 @@ export default function MultipleChoiceTriviaModal({
     if (!onStatusChange) return;
 
     try {
-      const response = await fetch(`/api/multiple-choice/${trivia.id}`, {
+      const response = await fetch(`/api/who-am-i/${trivia.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus }),
@@ -145,7 +142,7 @@ export default function MultipleChoiceTriviaModal({
     }
 
     try {
-      const response = await fetch(`/api/multiple-choice/${trivia.id}`, {
+      const response = await fetch(`/api/who-am-i/${trivia.id}`, {
         method: 'DELETE',
       });
 
@@ -222,30 +219,14 @@ export default function MultipleChoiceTriviaModal({
           </div>
 
           {/* Correct Answer */}
-          <div className="rounded-lg bg-green-50 p-4 dark:bg-green-950/30">
-            <h3 className="text-sm font-medium text-green-900 dark:text-green-200 mb-2">
-              Correct Answer
+          <div className="rounded-lg bg-blue-50 p-4 dark:bg-blue-950/30">
+            <h3 className="text-sm font-medium text-blue-900 dark:text-blue-200 mb-2">
+              Answer
             </h3>
-            <p className="text-base text-green-800 dark:text-green-100">
+            <p className="text-base text-blue-800 dark:text-blue-100">
               {trivia.correct_answer}
             </p>
           </div>
-
-          {/* Wrong Answers */}
-          {trivia.wrong_answers && trivia.wrong_answers.length > 0 && (
-            <div className="rounded-lg bg-red-50 p-4 dark:bg-red-950/30">
-              <h3 className="text-sm font-medium text-red-900 dark:text-red-200 mb-2">
-                Wrong Answers
-              </h3>
-              <ul className="space-y-2">
-                {trivia.wrong_answers.map((answer, index) => (
-                  <li key={index} className="text-base text-red-800 dark:text-red-100">
-                    {index + 1}. {answer}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
 
           {/* Explanation */}
           {trivia.explanation && (
@@ -368,6 +349,4 @@ export default function MultipleChoiceTriviaModal({
     </div>
   );
 }
-
-
 

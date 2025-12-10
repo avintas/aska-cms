@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import type { TrueFalseTrivia } from '@aska/shared';
-import TrueFalseTriviaCard from '@/components/true-false/TrueFalseTriviaCard';
+import TrueFalseTriviaListItem from '@/components/true-false/TrueFalseTriviaListItem';
+import TrueFalseTriviaModal from '@/components/true-false/TrueFalseTriviaModal';
 
 type StatusFilter = 'unpublished' | 'published' | 'archived';
 
@@ -12,12 +13,14 @@ export default function TrueFalseTriviaListPage(): JSX.Element {
   const [total, setTotal] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('unpublished');
+  const [selectedTrivia, setSelectedTrivia] = useState<TrueFalseTrivia | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [stats, setStats] = useState({
     unpublished: 0,
     published: 0,
     archived: 0,
   });
-  const limit = 5;
+  const limit = 20;
   const totalPages = total > 0 ? Math.ceil(total / limit) : 0;
 
   const fetchStats = useCallback(async () => {
@@ -99,8 +102,24 @@ export default function TrueFalseTriviaListPage(): JSX.Element {
     // Decrease total - useEffect will handle page adjustment if needed
     setTotal((prev) => prev - 1);
 
+    // Close modal if the deleted item was selected
+    if (selectedTrivia?.id === id) {
+      setIsModalOpen(false);
+      setSelectedTrivia(null);
+    }
+
     // Refresh stats
     fetchStats();
+  };
+
+  const handleItemClick = (trivia: TrueFalseTrivia): void => {
+    setSelectedTrivia(trivia);
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = (): void => {
+    setIsModalOpen(false);
+    setSelectedTrivia(null);
   };
 
   const goToPage = (page: number): void => {
@@ -200,14 +219,17 @@ export default function TrueFalseTriviaListPage(): JSX.Element {
             </div>
           ) : (
             <>
-              {items.map((trivia) => (
-                <TrueFalseTriviaCard
-                  key={trivia.id}
-                  trivia={trivia}
-                  onStatusChange={handleStatusChange}
-                  onDelete={handleDelete}
-                />
-              ))}
+              <div className="space-y-2">
+                {items.map((trivia) => (
+                  <TrueFalseTriviaListItem
+                    key={trivia.id}
+                    trivia={trivia}
+                    onStatusChange={handleStatusChange}
+                    onDelete={handleDelete}
+                    onClick={handleItemClick}
+                  />
+                ))}
+              </div>
 
               {/* Pagination */}
               {totalPages > 1 && (
@@ -277,6 +299,15 @@ export default function TrueFalseTriviaListPage(): JSX.Element {
             </>
           )}
         </section>
+
+        {/* Modal */}
+        <TrueFalseTriviaModal
+          trivia={selectedTrivia}
+          isOpen={isModalOpen}
+          onClose={handleCloseModal}
+          onStatusChange={handleStatusChange}
+          onDelete={handleDelete}
+        />
       </div>
     </div>
   );

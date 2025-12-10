@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import type { WhoAmITrivia } from '@aska/shared';
-import WhoAmITriviaCard from '@/components/who-am-i/WhoAmITriviaCard';
+import WhoAmITriviaListItem from '@/components/who-am-i/WhoAmITriviaListItem';
+import WhoAmITriviaModal from '@/components/who-am-i/WhoAmITriviaModal';
 
 type StatusFilter = 'unpublished' | 'published' | 'archived';
 
@@ -12,12 +13,14 @@ export default function WhoAmITriviaListPage(): JSX.Element {
   const [total, setTotal] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('unpublished');
+  const [selectedTrivia, setSelectedTrivia] = useState<WhoAmITrivia | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [stats, setStats] = useState({
     unpublished: 0,
     published: 0,
     archived: 0,
   });
-  const limit = 5;
+  const limit = 20;
   const totalPages = total > 0 ? Math.ceil(total / limit) : 0;
 
   const fetchStats = useCallback(async () => {
@@ -99,8 +102,24 @@ export default function WhoAmITriviaListPage(): JSX.Element {
     // Decrease total - useEffect will handle page adjustment if needed
     setTotal((prev) => prev - 1);
 
+    // Close modal if the deleted item was selected
+    if (selectedTrivia?.id === id) {
+      setIsModalOpen(false);
+      setSelectedTrivia(null);
+    }
+
     // Refresh stats
     fetchStats();
+  };
+
+  const handleItemClick = (trivia: WhoAmITrivia): void => {
+    setSelectedTrivia(trivia);
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = (): void => {
+    setIsModalOpen(false);
+    setSelectedTrivia(null);
   };
 
   const goToPage = (page: number): void => {
@@ -200,14 +219,17 @@ export default function WhoAmITriviaListPage(): JSX.Element {
             </div>
           ) : (
             <>
-              {items.map((trivia) => (
-                <WhoAmITriviaCard
-                  key={trivia.id}
-                  trivia={trivia}
-                  onStatusChange={handleStatusChange}
-                  onDelete={handleDelete}
-                />
-              ))}
+              <div className="space-y-2">
+                {items.map((trivia) => (
+                  <WhoAmITriviaListItem
+                    key={trivia.id}
+                    trivia={trivia}
+                    onStatusChange={handleStatusChange}
+                    onDelete={handleDelete}
+                    onClick={handleItemClick}
+                  />
+                ))}
+              </div>
 
               {/* Pagination */}
               {totalPages > 1 && (
@@ -277,6 +299,15 @@ export default function WhoAmITriviaListPage(): JSX.Element {
             </>
           )}
         </section>
+
+        {/* Modal */}
+        <WhoAmITriviaModal
+          trivia={selectedTrivia}
+          isOpen={isModalOpen}
+          onClose={handleCloseModal}
+          onStatusChange={handleStatusChange}
+          onDelete={handleDelete}
+        />
       </div>
     </div>
   );

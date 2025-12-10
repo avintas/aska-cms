@@ -1,21 +1,21 @@
 'use client';
 
-import type { MultipleChoiceTrivia } from '@aska/shared';
+import type { WhoAmITrivia } from '@aska/shared';
 import { StatusBadge } from '@/components/ui/CollectionList';
 
-interface MultipleChoiceTriviaListItemProps {
-  trivia: MultipleChoiceTrivia;
+interface WhoAmITriviaListItemProps {
+  trivia: WhoAmITrivia;
   onStatusChange?: (id: number, newStatus: string) => void;
   onDelete?: (id: number) => void;
-  onClick?: (trivia: MultipleChoiceTrivia) => void;
+  onClick?: (trivia: WhoAmITrivia) => void;
 }
 
-export default function MultipleChoiceTriviaListItem({
+export default function WhoAmITriviaListItem({
   trivia,
   onStatusChange,
   onDelete,
   onClick,
-}: MultipleChoiceTriviaListItemProps): JSX.Element {
+}: WhoAmITriviaListItemProps): JSX.Element {
   // Handle status change (publish/unpublish/archive)
   const handleStatusChange = async (
     e: React.MouseEvent<HTMLButtonElement>,
@@ -25,7 +25,7 @@ export default function MultipleChoiceTriviaListItem({
     if (!onStatusChange) return;
 
     try {
-      const response = await fetch(`/api/multiple-choice/${trivia.id}`, {
+      const response = await fetch(`/api/who-am-i/${trivia.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus }),
@@ -62,7 +62,7 @@ export default function MultipleChoiceTriviaListItem({
     }
 
     try {
-      const response = await fetch(`/api/multiple-choice/${trivia.id}`, {
+      const response = await fetch(`/api/who-am-i/${trivia.id}`, {
         method: 'DELETE',
       });
 
@@ -111,6 +111,9 @@ export default function MultipleChoiceTriviaListItem({
           </div>
           <p className="text-sm text-gray-900 leading-relaxed dark:text-gray-100">
             {questionPreview}
+          </p>
+          <p className="mt-1 text-xs text-blue-600 dark:text-blue-400 font-medium">
+            Answer: {trivia.correct_answer}
           </p>
         </div>
 
@@ -179,6 +182,4 @@ export default function MultipleChoiceTriviaListItem({
     </div>
   );
 }
-
-
 

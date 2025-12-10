@@ -1,24 +1,25 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import type { MultipleChoiceTrivia } from '@aska/shared';
+import type { TrueFalseTrivia } from '@aska/shared';
 import { StatusBadge } from '@/components/ui/CollectionList';
+import TrueFalseMiniPlayer from './TrueFalseMiniPlayer';
 
-interface MultipleChoiceTriviaModalProps {
-  trivia: MultipleChoiceTrivia | null;
+interface TrueFalseTriviaModalProps {
+  trivia: TrueFalseTrivia | null;
   isOpen: boolean;
   onClose: () => void;
   onStatusChange?: (id: number, newStatus: string) => void;
   onDelete?: (id: number) => void;
 }
 
-export default function MultipleChoiceTriviaModal({
+export default function TrueFalseTriviaModal({
   trivia,
   isOpen,
   onClose,
   onStatusChange,
   onDelete,
-}: MultipleChoiceTriviaModalProps): JSX.Element | null {
+}: TrueFalseTriviaModalProps): JSX.Element | null {
   const modalRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -88,10 +89,7 @@ export default function MultipleChoiceTriviaModal({
   // Copy trivia to clipboard
   const handleCopy = async (): Promise<void> => {
     try {
-      let textToCopy = `Question: ${trivia.question_text}\nCorrect Answer: ${trivia.correct_answer}`;
-      if (trivia.wrong_answers && trivia.wrong_answers.length > 0) {
-        textToCopy = `${textToCopy}\nWrong Answers: ${trivia.wrong_answers.join(', ')}`;
-      }
+      let textToCopy = `Statement: ${trivia.question_text}\nAnswer: ${trivia.is_true ? 'TRUE' : 'FALSE'}`;
       if (trivia.explanation) {
         textToCopy = `${textToCopy}\nExplanation: ${trivia.explanation}`;
       }
@@ -108,7 +106,7 @@ export default function MultipleChoiceTriviaModal({
     if (!onStatusChange) return;
 
     try {
-      const response = await fetch(`/api/multiple-choice/${trivia.id}`, {
+      const response = await fetch(`/api/true-false/${trivia.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus }),
@@ -136,6 +134,16 @@ export default function MultipleChoiceTriviaModal({
     }
   };
 
+  // Handle approve from Mini-Player
+  const handleApprove = async (): Promise<void> => {
+    await handleStatusChange('published');
+  };
+
+  // Handle reject from Mini-Player
+  const handleReject = async (): Promise<void> => {
+    await handleStatusChange('archived');
+  };
+
   // Handle delete
   const handleDelete = async (): Promise<void> => {
     if (!onDelete) return;
@@ -145,7 +153,7 @@ export default function MultipleChoiceTriviaModal({
     }
 
     try {
-      const response = await fetch(`/api/multiple-choice/${trivia.id}`, {
+      const response = await fetch(`/api/true-false/${trivia.id}`, {
         method: 'DELETE',
       });
 
@@ -211,41 +219,37 @@ export default function MultipleChoiceTriviaModal({
 
         {/* Content */}
         <div className="px-6 py-4 space-y-4">
-          {/* Question Text */}
+          {/* Question Text (Statement) */}
           <div>
             <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Question
+              Statement
             </h3>
             <p className="text-base text-gray-900 leading-relaxed dark:text-gray-100">
               {trivia.question_text}
             </p>
           </div>
 
-          {/* Correct Answer */}
-          <div className="rounded-lg bg-green-50 p-4 dark:bg-green-950/30">
-            <h3 className="text-sm font-medium text-green-900 dark:text-green-200 mb-2">
+          {/* Correct Answer (TRUE/FALSE) */}
+          <div
+            className={`rounded-lg p-4 ${
+              trivia.is_true
+                ? 'bg-green-50 dark:bg-green-950/30'
+                : 'bg-red-50 dark:bg-red-950/30'
+            }`}
+          >
+            <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Correct Answer
             </h3>
-            <p className="text-base text-green-800 dark:text-green-100">
-              {trivia.correct_answer}
+            <p
+              className={`text-base font-medium ${
+                trivia.is_true
+                  ? 'text-green-900 dark:text-green-200'
+                  : 'text-red-900 dark:text-red-200'
+              }`}
+            >
+              {trivia.is_true ? 'TRUE' : 'FALSE'}
             </p>
           </div>
-
-          {/* Wrong Answers */}
-          {trivia.wrong_answers && trivia.wrong_answers.length > 0 && (
-            <div className="rounded-lg bg-red-50 p-4 dark:bg-red-950/30">
-              <h3 className="text-sm font-medium text-red-900 dark:text-red-200 mb-2">
-                Wrong Answers
-              </h3>
-              <ul className="space-y-2">
-                {trivia.wrong_answers.map((answer, index) => (
-                  <li key={index} className="text-base text-red-800 dark:text-red-100">
-                    {index + 1}. {answer}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
 
           {/* Explanation */}
           {trivia.explanation && (
@@ -298,6 +302,19 @@ export default function MultipleChoiceTriviaModal({
                 </div>
               )}
             </div>
+          </div>
+
+          {/* Mini Player Section */}
+          <div className="border-t border-gray-200 pt-4 dark:border-slate-800">
+            <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-4">
+              Test Question
+            </h3>
+            <TrueFalseMiniPlayer
+              trivia={trivia}
+              onApprove={handleApprove}
+              onReject={handleReject}
+              showApprovalButtons={false}
+            />
           </div>
         </div>
 
@@ -368,6 +385,4 @@ export default function MultipleChoiceTriviaModal({
     </div>
   );
 }
-
-
 
