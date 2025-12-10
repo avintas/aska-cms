@@ -210,6 +210,7 @@ export default function SourcingPage(): JSX.Element {
 
   const feedbackState = autoStatus ?? state;
   const canProcess = content.trim().length > 0 && !isBusy;
+  // Show review step when in review mode and metadata is available
   const showReview = currentStep === 'review' && extractedMetadata && currentStep !== 'finalization';
   const showFinalization = currentStep === 'finalization' && extractedMetadata;
 
