@@ -370,7 +370,7 @@ function normalizeFactItem(item: Record<string, unknown>, _sourceId?: number | n
     year: year ?? undefined,
     theme: coerceNullableString(item.theme),
     category: coerceNullableString(item.category),
-    attribution: coerceNullableString(item.attribution),
+    // Note: attribution is NOT included - collection_hockey_facts table does not have this column
     status: DEFAULT_STATUS,
     source_content_id: typeof _sourceId === 'number' && Number.isFinite(_sourceId) ? _sourceId : undefined,
   };
