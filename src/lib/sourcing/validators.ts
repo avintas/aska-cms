@@ -277,14 +277,30 @@ export function validateEnrichedContent(input: unknown): {
   };
 }
 
+/**
+ * Suitability analysis uses the same keys as generator tracks:
+ *   - trivia_multiple_choice
+ *   - trivia_true_false
+ *   - trivia_who_am_i
+ *   - motivational
+ *   - facts
+ *   - wisdom
+ */
 export interface ContentSuitabilityAnalysis {
-  multiple_choice_trivia?: { suitable: boolean; confidence: number; reasoning: string };
-  true_false_trivia?: { suitable: boolean; confidence: number; reasoning: string };
-  who_am_i_trivia?: { suitable: boolean; confidence: number; reasoning: string };
+  trivia_multiple_choice?: { suitable: boolean; confidence: number; reasoning: string };
+  trivia_true_false?: { suitable: boolean; confidence: number; reasoning: string };
+  trivia_who_am_i?: { suitable: boolean; confidence: number; reasoning: string };
   motivational?: { suitable: boolean; confidence: number; reasoning: string };
   facts?: { suitable: boolean; confidence: number; reasoning: string };
   wisdom?: { suitable: boolean; confidence: number; reasoning: string };
 }
+
+// Legacy key names for backwards compatibility with existing database data
+const LEGACY_KEY_MAP: Record<string, keyof ContentSuitabilityAnalysis> = {
+  multiple_choice_trivia: 'trivia_multiple_choice',
+  true_false_trivia: 'trivia_true_false',
+  who_am_i_trivia: 'trivia_who_am_i',
+};
 
 export function validateContentSuitabilityAnalysis(input: unknown): {
   valid: boolean;
@@ -294,10 +310,11 @@ export function validateContentSuitabilityAnalysis(input: unknown): {
   const errors: string[] = [];
   const obj = input as Record<string, unknown>;
 
-  const contentTypes = [
-    'multiple_choice_trivia',
-    'true_false_trivia',
-    'who_am_i_trivia',
+  // Current key names (matching generator track keys)
+  const contentTypes: Array<keyof ContentSuitabilityAnalysis> = [
+    'trivia_multiple_choice',
+    'trivia_true_false',
+    'trivia_who_am_i',
     'motivational',
     'facts',
     'wisdom',
@@ -306,7 +323,17 @@ export function validateContentSuitabilityAnalysis(input: unknown): {
   const result: ContentSuitabilityAnalysis = {};
 
   for (const contentType of contentTypes) {
-    const analysis = obj?.[contentType] as Record<string, unknown> | undefined;
+    // Try current key first, then fall back to legacy key
+    let analysis = obj?.[contentType] as Record<string, unknown> | undefined;
+    
+    // Check for legacy key names (for existing database data)
+    if (!analysis) {
+      const legacyKey = Object.entries(LEGACY_KEY_MAP).find(([, v]) => v === contentType)?.[0];
+      if (legacyKey) {
+        analysis = obj?.[legacyKey] as Record<string, unknown> | undefined;
+      }
+    }
+
     if (analysis) {
       const suitable = analysis.suitable as boolean | undefined;
       const confidence = analysis.confidence as number | undefined;
@@ -325,7 +352,7 @@ export function validateContentSuitabilityAnalysis(input: unknown): {
         continue;
       }
 
-      result[contentType as keyof ContentSuitabilityAnalysis] = {
+      result[contentType] = {
         suitable,
         confidence,
         reasoning,

@@ -1,40 +1,35 @@
 'use server';
 
 import { generateContentAction } from '@/app/main-generator/actions';
-import type { GeneratorTrackKey } from '@/lib/generator/types';
 import type { ContentSuitabilityAnalysis } from '@/lib/sourcing/validators';
 import { createServerClient } from '@/utils/supabase/server';
 
 /**
- * Mapping from suitability analysis keys to generator track keys
+ * Content types that can be generated from suitability analysis.
+ * These keys match both suitability analysis AND generator track keys:
+ *   - trivia_multiple_choice  → trivia_multiple_choice table
+ *   - trivia_true_false       → trivia_true_false table
+ *   - trivia_who_am_i         → trivia_who_am_i table
+ *   - motivational            → collection_hockey_motivate table
+ *   - facts                   → collection_hockey_facts table
+ *   - wisdom                  → collection_hockey_wisdom table
  */
-const SUITABILITY_TO_TRACK_KEY: Record<string, GeneratorTrackKey> = {
-  multiple_choice_trivia: 'trivia_multiple_choice',
-  true_false_trivia: 'trivia_true_false',
-  who_am_i_trivia: 'trivia_who_am_i',
-  motivational: 'motivational',
-  facts: 'facts',
-  wisdom: 'wisdom',
-};
+const SUPPORTED_CONTENT_TYPES = [
+  'trivia_multiple_choice',
+  'trivia_true_false',
+  'trivia_who_am_i',
+  'motivational',
+  'facts',
+  'wisdom',
+] as const;
 
-/**
- * Mapping from track keys to usage keys for tracking
- */
-const TRACK_KEY_TO_USAGE_KEY: Record<GeneratorTrackKey, string> = {
-  trivia_multiple_choice: 'multiple-choice',
-  trivia_true_false: 'true-false',
-  trivia_who_am_i: 'who-am-i',
-  motivational: 'motivational',
-  facts: 'fact',
-  wisdom: 'wisdom',
-};
+type SupportedContentType = (typeof SUPPORTED_CONTENT_TYPES)[number];
 
 export interface ProcessSuitableContentResult {
   success: boolean;
   sourceId: number;
   processed: Array<{
     contentType: string;
-    trackKey: GeneratorTrackKey;
     success: boolean;
     message: string;
     itemCount?: number;
@@ -48,8 +43,8 @@ export interface ProcessSuitableContentResult {
 }
 
 /**
- * Process a source for all suitable content types based on suitability_analysis
- * Only processes content types where suitable === true AND confidence >= 0.7
+ * Process a source for all suitable content types based on suitability_analysis.
+ * Only processes content types where suitable === true AND confidence >= threshold.
  */
 export async function processSourceForAllSuitableTypes(
   sourceId: number,
@@ -102,85 +97,58 @@ export async function processSourceForAllSuitableTypes(
   const processed: ProcessSuitableContentResult['processed'] = [];
   const skipped: ProcessSuitableContentResult['skipped'] = [];
 
-  // First, track all skipped types (for reporting)
-  for (const [suitabilityKey, analysis] of Object.entries(suitabilityAnalysis)) {
+  // Check each supported content type
+  for (const contentType of SUPPORTED_CONTENT_TYPES) {
+    const analysis = suitabilityAnalysis[contentType];
+
     if (!analysis) {
       skipped.push({
-        contentType: suitabilityKey,
-        reason: 'Analysis data is missing',
+        contentType,
+        reason: 'No analysis data',
       });
       continue;
     }
 
-    // Track types that don't meet threshold
-    if (!analysis.suitable || analysis.confidence < minConfidence) {
+    if (!analysis.suitable) {
       skipped.push({
-        contentType: suitabilityKey,
-        reason: analysis.suitable
-          ? `Confidence ${(analysis.confidence * 100).toFixed(0)}% is below threshold ${(minConfidence * 100).toFixed(0)}%`
-          : 'Not suitable for this content type',
-      });
-    }
-  }
-
-  // Filter to only suitable types that meet threshold for processing
-  const suitableTypes = Object.entries(suitabilityAnalysis).filter(
-    ([, analysis]) => analysis && analysis.suitable && analysis.confidence >= minConfidence
-  );
-
-  // Process each content type that is suitable (with rate limiting)
-  for (let i = 0; i < suitableTypes.length; i++) {
-    const [suitabilityKey, analysis] = suitableTypes[i];
-
-    // Map suitability key to track key
-    const trackKey = SUITABILITY_TO_TRACK_KEY[suitabilityKey];
-    if (!trackKey) {
-      skipped.push({
-        contentType: suitabilityKey,
-        reason: `No track key mapping found for ${suitabilityKey}`,
+        contentType,
+        reason: 'Not suitable for this content type',
       });
       continue;
     }
 
-    // Generate content for this content type
+    if (analysis.confidence < minConfidence) {
+      skipped.push({
+        contentType,
+        reason: `Confidence ${(analysis.confidence * 100).toFixed(0)}% is below threshold ${(minConfidence * 100).toFixed(0)}%`,
+      });
+      continue;
+    }
+
+    // Generate content - contentType is already the track key
     try {
       const result = await generateContentAction({
-        trackKey,
+        trackKey: contentType,
         sourceId,
       });
 
-      if (result.success) {
-        // Update used_for tracking
-        const usageKey = TRACK_KEY_TO_USAGE_KEY[trackKey];
-        await updateSourceUsageInDb(sourceId, usageKey);
-
-        processed.push({
-          contentType: suitabilityKey,
-          trackKey,
-          success: true,
-          message: result.message || 'Content generated successfully',
-          itemCount: result.itemCount,
-        });
-      } else {
-        processed.push({
-          contentType: suitabilityKey,
-          trackKey,
-          success: false,
-          message: result.message || 'Generation failed',
-        });
-      }
+      processed.push({
+        contentType,
+        success: result.success,
+        message: result.message || (result.success ? 'Content generated successfully' : 'Generation failed'),
+        itemCount: result.itemCount,
+      });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       processed.push({
-        contentType: suitabilityKey,
-        trackKey,
+        contentType,
         success: false,
         message: `Error: ${errorMessage}`,
       });
     }
 
-    // Rate limiting: wait 2 seconds before processing next content type (except after the last one)
-    if (i < suitableTypes.length - 1) {
+    // Rate limiting: wait 2 seconds before processing next content type
+    if (processed.length < SUPPORTED_CONTENT_TYPES.length) {
       await new Promise((resolve) => setTimeout(resolve, 2000));
     }
   }
@@ -194,33 +162,3 @@ export async function processSourceForAllSuitableTypes(
     totalSkipped: skipped.length,
   };
 }
-
-/**
- * Update used_for tracking for a source
- */
-async function updateSourceUsageInDb(sourceId: number, usageKey: string): Promise<void> {
-  const supabase = await createServerClient();
-
-  // Get current used_for array
-  const { data: source } = await supabase
-    .from('source_content_ingested')
-    .select('used_for')
-    .eq('id', sourceId)
-    .maybeSingle();
-
-  if (!source) return;
-
-  const currentUsedFor = Array.isArray(source.used_for)
-    ? source.used_for.map((v) => String(v))
-    : [];
-
-  // Add usage key if not already present
-  if (!currentUsedFor.includes(usageKey)) {
-    const updatedUsedFor = [...currentUsedFor, usageKey];
-    await supabase
-      .from('source_content_ingested')
-      .update({ used_for: updatedUsedFor })
-      .eq('id', sourceId);
-  }
-}
-
