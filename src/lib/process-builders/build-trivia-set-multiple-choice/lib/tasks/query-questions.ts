@@ -22,7 +22,8 @@ export const queryQuestionsTask: ProcessBuilderTask = {
       if (preSelectedCandidates && Array.isArray(preSelectedCandidates)) {
         // Use pre-selected candidates (already filtered and sorted by usage)
         const questionCountRule = context.rules.questionCount;
-        const questionCount = (questionCountRule?.value as number) || preSelectedCandidates.length;
+        // Use nullish coalescing (??) instead of || to properly handle 0 as a valid number
+        const questionCount = (questionCountRule?.value as number) ?? preSelectedCandidates.length;
 
         return {
           success: true,
