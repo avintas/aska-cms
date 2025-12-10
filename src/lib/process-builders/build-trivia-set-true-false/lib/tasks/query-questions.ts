@@ -18,18 +18,7 @@ export const queryQuestionsTask: ProcessBuilderTask = {
 
       // Extract theme from goal
       const theme = context.goal.text.trim();
-      if (!theme) {
-        return {
-          success: false,
-          errors: [
-            {
-              code: 'INVALID_INPUT',
-              message: 'Theme is required in goal text',
-            },
-          ],
-        };
-      }
-
+      
       // Extract question count from rules
       const questionCountRule = context.rules.questionCount;
       if (!questionCountRule || typeof questionCountRule.value !== 'number') {
@@ -52,8 +41,8 @@ export const queryQuestionsTask: ProcessBuilderTask = {
         .select('*')
         .eq('status', 'published'); // Only published questions
 
-      // Filter by theme if provided
-      if (theme) {
+      // Filter by theme if provided (empty theme means "all themes")
+      if (theme && theme !== 'All Available') {
         query = query.ilike('theme', `%${theme}%`);
       }
 

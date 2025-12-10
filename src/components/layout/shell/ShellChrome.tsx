@@ -123,6 +123,16 @@ export default function ShellChrome({ children, userEmail }: ShellChromeProps): 
             description: 'Create curated trivia sets from questions (MC, TF, Who Am I).',
           },
           {
+            label: 'Automated Set Builder',
+            href: '/process-builders/automated-set-builder',
+            description: 'Configure and manage automated daily trivia set building.',
+          },
+          {
+            label: 'Collection Trivia Sets',
+            href: '/process-builders/collection-trivia-sets',
+            description: 'Review created trivia set collections.',
+          },
+          {
             label: 'Publishing',
             href: '/publishing',
             description: 'Generate and manage daily shareable schedules.',

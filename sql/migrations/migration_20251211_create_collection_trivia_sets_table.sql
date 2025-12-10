@@ -15,7 +15,8 @@ CREATE TABLE IF NOT EXISTS public.collection_trivia_sets (
   id BIGSERIAL PRIMARY KEY,
   
   -- The date these sets are scheduled to publish (ISO date string)
-  publish_date DATE NOT NULL UNIQUE,
+  -- Note: NOT UNIQUE - multiple sets can share the same publish_date (one record per set)
+  publish_date DATE NOT NULL,
   
   -- Array of complete trivia sets stored as JSONB
   -- Each element: {"type": "mc"|"tf"|"wai", "set": {full set object}}
@@ -55,7 +56,7 @@ ON public.collection_trivia_sets USING GIN (sets);
 -- ========================================================================
 
 COMMENT ON TABLE public.collection_trivia_sets IS 
-'Stores published trivia sets for daily deployment by Automated Set Building System. Full set content is stored as JSONB snapshots, supporting mixed types (MC, TF, WAI). One row per publish date.';
+'Stores published trivia sets for daily deployment by Automated Set Building System. Full set content is stored as JSONB snapshots, supporting mixed types (MC, TF, WAI). One row per trivia set (multiple sets can share the same publish_date).';
 
 COMMENT ON COLUMN public.collection_trivia_sets.publish_date IS 
 'The date these sets are scheduled to publish (ISO date string, e.g., 2025-12-11)';

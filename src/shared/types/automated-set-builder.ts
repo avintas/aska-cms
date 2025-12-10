@@ -4,6 +4,7 @@
  */
 
 import type { MultipleChoiceTriviaSet } from '@/lib/process-builders/build-trivia-set-multiple-choice/lib/types/trivia-set';
+import type { TrueFalseTriviaSet } from '@/lib/process-builders/build-trivia-set-true-false/lib/types/trivia-set';
 
 // ========================================================================
 // SET TYPE
@@ -18,46 +19,61 @@ export type TriviaSetType = 'mc' | 'tf' | 'wai';
 /**
  * A single trivia set stored in collection_trivia_sets
  * Contains the full set object with its type identifier
+ * @deprecated Use CollectionTriviaSet instead - this is kept for backward compatibility during migration
  */
 export interface CollectionTriviaSetEntry {
   /** Type of trivia set */
   type: TriviaSetType;
   /** Full set object (matches the structure from sets_trivia_multiple_choice, sets_trivia_true_false, or sets_trivia_who_am_i) */
-  set: MultipleChoiceTriviaSet; // TODO: Create union type for all set types when TF/WAI are added
+  set: MultipleChoiceTriviaSet | TrueFalseTriviaSet; // TODO: Add WhoAmI when implemented
 }
 
 /**
- * Collection of trivia sets for a single publish date
- * Stored in collection_trivia_sets table
+ * A single trivia set record in collection_trivia_sets table
+ * One row per trivia set (not grouped by publish_date)
  */
-export interface CollectionTriviaSets {
+export interface CollectionTriviaSet {
   /** Primary key */
   id: number;
-  /** The date these sets are scheduled to publish (ISO date string) */
+  /** The date this set is scheduled to publish (ISO date string) */
   publish_date: string;
-  /** Array of complete trivia sets stored as JSONB */
-  sets: CollectionTriviaSetEntry[];
-  /** Number of sets in the collection */
-  set_count: number;
-  /** Status of the automated run */
+  /** Type of trivia set: 'mc', 'tf', or 'wai' */
+  set_type: TriviaSetType;
+  /** Complete trivia set object stored as JSONB */
+  set_data: MultipleChoiceTriviaSet | TrueFalseTriviaSet;
+  /** Status of the automated run that created this set */
   run_status: 'completed' | 'partial' | 'failed';
   /** Message about the run (success message or error) */
   run_message: string | null;
-  /** When this collection was created */
+  /** When this set record was created */
   created_at: string;
-  /** When this collection was last updated */
+  /** When this set record was last updated */
   updated_at: string;
 }
 
 /**
- * Input for creating a new collection entry
+ * Input for creating a new trivia set record
  */
-export interface CollectionTriviaSetsCreateInput {
+export interface CollectionTriviaSetCreateInput {
   publish_date: string;
-  sets: CollectionTriviaSetEntry[];
-  set_count?: number;
+  set_type: TriviaSetType;
+  set_data: MultipleChoiceTriviaSet | TrueFalseTriviaSet;
   run_status?: 'completed' | 'partial' | 'failed';
   run_message?: string | null;
+}
+
+/**
+ * Collection of trivia sets for a single publish date
+ * Used for querying/displaying sets grouped by date
+ * @deprecated This is now a query result, not a table structure
+ */
+export interface CollectionTriviaSets {
+  /** The date these sets are scheduled to publish (ISO date string) */
+  publish_date: string;
+  /** Array of trivia set records */
+  sets: CollectionTriviaSet[];
+  /** Number of sets in the collection */
+  set_count: number;
 }
 
 // ========================================================================

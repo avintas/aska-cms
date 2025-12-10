@@ -5,6 +5,7 @@
 
 import { getSupabaseAdmin } from '@/utils/supabase/admin';
 import { buildTriviaSetMultipleChoice } from '@/lib/process-builders/build-trivia-set-multiple-choice/lib/build-trivia-set-multiple-choice';
+import { buildTriviaSetTrueFalse } from '@/lib/process-builders/build-trivia-set-true-false/lib/build-trivia-set-true-false';
 import { queryQuestionsByUsage } from './helpers/query-questions-by-usage';
 import { trackSetUsage, extractQuestionIds } from './helpers/track-usage';
 import { getAutomatedBuilderConfig, updateLastRunInfo } from './config';
@@ -15,10 +16,11 @@ import type {
 } from '@/lib/process-builders/core/types';
 import type {
   AutomatedSetBuilderConfig,
-  CollectionTriviaSetsCreateInput,
+  CollectionTriviaSetCreateInput,
   CollectionTriviaSetEntry,
 } from '@/shared/types/automated-set-builder';
 import type { MultipleChoiceTriviaSet } from '@/lib/process-builders/build-trivia-set-multiple-choice/lib/types/trivia-set';
+import type { TrueFalseTriviaSet } from '@/lib/process-builders/build-trivia-set-true-false/lib/types/trivia-set';
 
 export interface BuildAutomatedSetsResult {
   success: boolean;
@@ -30,11 +32,18 @@ export interface BuildAutomatedSetsResult {
 }
 
 /**
- * Build automated trivia sets for today
+ * Build automated trivia sets
  * Reads configuration, creates sets, tracks usage, and stores in collection
  */
 export async function buildAutomatedSets(
   publishDate?: string,
+  numberOfSets?: number,
+  triviaType: 'mc' | 'tf' | 'mix' = 'mc',
+  overrides?: {
+    questions_per_set?: number;
+    themes?: string[] | null;
+    balance_themes?: boolean;
+  },
 ): Promise<BuildAutomatedSetsResult> {
   const result: BuildAutomatedSetsResult = {
     success: false,
@@ -54,17 +63,21 @@ export async function buildAutomatedSets(
       return result;
     }
 
-    if (!config.enabled) {
-      result.errors.push('Automated set builder is disabled');
-      await updateLastRunInfo('failed', 'Automated set builder is disabled');
-      return result;
-    }
-
     // Use provided date or today's date
     const targetDate = publishDate || new Date().toISOString().split('T')[0];
 
-    // Build sets
-    const buildResult = await buildSetsForDate(config, targetDate, result);
+    // Use provided numberOfSets or config default
+    const setsToBuild = numberOfSets ?? config.sets_per_day;
+
+    // Build sets with optional overrides and trivia type
+    const buildResult = await buildSetsForDate(
+      config,
+      targetDate,
+      setsToBuild,
+      triviaType,
+      result,
+      overrides,
+    );
 
     // Update last run info
     const runStatus =
@@ -98,26 +111,43 @@ export async function buildAutomatedSets(
 async function buildSetsForDate(
   config: AutomatedSetBuilderConfig,
   publishDate: string,
+  numberOfSets: number,
+  triviaType: 'mc' | 'tf' | 'mix',
   result: BuildAutomatedSetsResult,
+  overrides?: {
+    questions_per_set?: number;
+    themes?: string[] | null;
+    balance_themes?: boolean;
+  },
 ): Promise<BuildAutomatedSetsResult> {
   const setsToCreate: CollectionTriviaSetEntry[] = [];
   const errors: string[] = [];
 
+  // Determine set type for each iteration (for mix, alternate)
+  const getSetTypeForIndex = (index: number): 'mc' | 'tf' => {
+    if (triviaType === 'mix') {
+      return index % 2 === 0 ? 'mc' : 'tf';
+    }
+    return triviaType;
+  };
+
   // Create each set
-  for (let i = 0; i < config.sets_per_day; i++) {
+  for (let i = 0; i < numberOfSets; i++) {
     try {
-      const setResult = await createSingleAutomatedSet(config);
+      const setType = getSetTypeForIndex(i);
+      const setResult = await createSingleAutomatedSet(config, setType, overrides);
 
       if (setResult.success && setResult.set) {
         setsToCreate.push({
-          type: 'mc', // For now, only MC. Will expand later
-          set: setResult.set,
+          type: setType,
+          set: setResult.set as MultipleChoiceTriviaSet | TrueFalseTriviaSet,
         });
-        result.setIds.push(setResult.set.id!);
+        // Note: Sets don't have database IDs since they're stored as JSONB in collection_trivia_sets
+        // setIds array is kept for API compatibility but not used for identification
         result.setsCreated++;
       } else {
         result.setsFailed++;
-        errors.push(`Set ${i + 1}: ${setResult.error || 'Unknown error'}`);
+        errors.push(`Set ${i + 1} (${setType.toUpperCase()}): ${setResult.error || 'Unknown error'}`);
       }
     } catch (error) {
       result.setsFailed++;
@@ -130,10 +160,15 @@ async function buildSetsForDate(
   result.errors.push(...errors);
 
   // Store sets in collection_trivia_sets table
+  // This is the main storage table - one row per trivia set
+  // Each set gets its own record with publish_date, set_type, and set_data
   if (setsToCreate.length > 0) {
     const storeResult = await storeSetsInCollection(publishDate, setsToCreate);
     if (!storeResult.success) {
-      result.errors.push(`Failed to store sets in collection: ${storeResult.error}`);
+      result.errors.push(`Failed to store sets in collection_trivia_sets: ${storeResult.error}`);
+      console.error('Store sets failed:', storeResult.error);
+    } else {
+      console.log(`Successfully stored ${setsToCreate.length} sets in database`);
     }
   }
 
@@ -145,55 +180,70 @@ async function buildSetsForDate(
  */
 async function createSingleAutomatedSet(
   config: AutomatedSetBuilderConfig,
+  setType: 'mc' | 'tf',
+  overrides?: {
+    questions_per_set?: number;
+    themes?: string[] | null;
+    balance_themes?: boolean;
+  },
 ): Promise<{
   success: boolean;
-  set?: MultipleChoiceTriviaSet;
+  set?: MultipleChoiceTriviaSet | TrueFalseTriviaSet;
   error?: string;
 }> {
   try {
-    // Query questions by usage with theme balancing
-    const questions = await queryQuestionsByUsage({
-      themes: config.themes,
-      limit: config.questions_per_set * 2, // Get extra for selection
-      balanceThemes: config.balance_themes,
-      minPerTheme: 2,
-    });
+    // Use overrides if provided, otherwise use config
+    const questionsPerSet = overrides?.questions_per_set ?? config.questions_per_set;
+    const themes = overrides?.themes !== undefined ? overrides.themes : config.themes;
+    const balanceThemes = overrides?.balance_themes ?? config.balance_themes;
 
-    if (questions.length < config.questions_per_set) {
-      return {
-        success: false,
-        error: `Insufficient questions: ${questions.length} available, ${config.questions_per_set} required`,
-      };
-    }
-
-    // Use mixed theme approach - goal text indicates mixed themes
+    // Build goal text from themes
+    // For automated builds: if multiple themes selected, use first one
+    // If no themes or null, use empty string (means "all themes")
+    // The query tasks will handle empty string by not filtering by theme
+    const themeText = themes && themes.length > 0 ? themes[0] : '';
     const goal: ProcessBuilderGoal = {
-      text: config.themes
-        ? `Mixed Themes: ${config.themes.join(', ')}`
-        : 'Mixed Themes: All Available',
+      text: themeText,
     };
 
     const rules: ProcessBuilderRules = {
       questionCount: {
         key: 'questionCount',
-        value: config.questions_per_set,
+        value: questionsPerSet,
         type: 'number',
       },
     };
 
-    // For now, we'll need to modify the query-questions task to use usage-based selection
-    // For automated builds, we'll pass the theme as "Mixed" and let the task handle it
-    // We'll need to create a modified query-questions task or pass candidates through metadata
     const options: ProcessBuilderOptions = {
       allowPartialResults: true,
-      // Pass pre-selected questions through options
-      preSelectedCandidates: questions,
     };
 
-    // Build the set using existing ProcessBuilder
-    const buildResult = await buildTriviaSetMultipleChoice(goal, rules, options);
+    // Build the set based on type
+    let buildResult;
+    if (setType === 'mc') {
+      // For MC, we can use usage-based querying
+      const questions = await queryQuestionsByUsage({
+        themes: themes,
+        limit: questionsPerSet * 2,
+        balanceThemes: balanceThemes,
+        minPerTheme: 2,
+      });
 
-    if (!buildResult.success || !buildResult.data) {
+      if (questions.length < questionsPerSet) {
+        return {
+          success: false,
+          error: `Insufficient MC questions: ${questions.length} available, ${questionsPerSet} required`,
+        };
+      }
+
+      options.preSelectedCandidates = questions;
+      buildResult = await buildTriviaSetMultipleChoice(goal, rules, options);
+    } else {
+      // For TF, use the standard builder (it queries directly from database)
+      buildResult = await buildTriviaSetTrueFalse(goal, rules, options);
+    }
+
+    if (buildResult.status !== 'success') {
       return {
         success: false,
         error:
@@ -202,9 +252,9 @@ async function createSingleAutomatedSet(
     }
 
     // Extract the created set from the final result
-    // The create-record task returns { triviaSet: MultipleChoiceTriviaSet }
+    // The create-record task returns { triviaSet: TriviaSet }
     const finalResultData = buildResult.finalResult as
-      | { triviaSet: MultipleChoiceTriviaSet }
+      | { triviaSet: MultipleChoiceTriviaSet | TrueFalseTriviaSet }
       | undefined;
 
     if (!finalResultData || !finalResultData.triviaSet) {
@@ -216,34 +266,18 @@ async function createSingleAutomatedSet(
 
     const set = finalResultData.triviaSet;
 
-    if (!set || !set.id) {
+    // Set is already complete - no need to fetch from database
+    // Sets are stored directly in collection_trivia_sets as JSONB, not in individual tables
+    if (!set) {
       return {
         success: false,
         error: 'Set was not properly created',
       };
     }
 
-    // Fetch the complete set from database to get question_data
-    // This ensures we have the full set including question_data for usage tracking
-    const supabase = getSupabaseAdmin();
-    const { data: fullSet, error: fetchError } = await supabase
-      .from('sets_trivia_multiple_choice')
-      .select('*')
-      .eq('id', set.id)
-      .single();
-
-    if (fetchError || !fullSet) {
-      return {
-        success: false,
-        error: `Failed to fetch created set: ${fetchError?.message || 'Unknown error'}`,
-      };
-    }
-
-    const completeSet = fullSet as MultipleChoiceTriviaSet;
-
     return {
       success: true,
-      set: completeSet,
+      set: set,
     };
   } catch (error) {
     return {
@@ -255,6 +289,8 @@ async function createSingleAutomatedSet(
 
 /**
  * Store sets in collection_trivia_sets table
+ * This is the main collection storage table - one row per trivia set
+ * Each set gets its own record with publish_date and sets array containing one set
  */
 async function storeSetsInCollection(
   publishDate: string,
@@ -263,43 +299,41 @@ async function storeSetsInCollection(
   try {
     const supabase = getSupabaseAdmin();
 
-    // Convert sets to JSONB array format for database
-    const setsJsonb = sets.map((entry) => ({
-      type: entry.type,
-      set: entry.set,
+    // Insert one record per set
+    // Each record has sets array with one set: [{"type": "mc", "set": {...}}]
+    const recordsToInsert = sets.map((entry) => ({
+      publish_date: publishDate,
+      sets: [
+        {
+          type: entry.type,
+          set: entry.set,
+        },
+      ] as any[], // JSONB array with one set
+      set_count: 1, // One set per record
+      run_status: 'completed' as const,
+      run_message: null,
     }));
 
-    const collectionData: CollectionTriviaSetsCreateInput = {
-      publish_date: publishDate,
-      sets: sets,
-      set_count: sets.length,
-      run_status: 'completed',
-      run_message: null,
-    };
-
-    const { error } = await supabase
+    // Insert all sets as individual records
+    // Log what we're trying to insert for debugging
+    console.log('Attempting to insert', recordsToInsert.length, 'records');
+    console.log('Sample record structure:', JSON.stringify(recordsToInsert[0], null, 2));
+    
+    const { data, error } = await supabase
       .from('collection_trivia_sets')
-      .upsert(
-        {
-          publish_date: publishDate,
-          sets: setsJsonb as any, // Supabase will handle JSONB conversion
-          set_count: sets.length,
-          run_status: 'completed',
-          run_message: null,
-          updated_at: new Date().toISOString(),
-        },
-        {
-          onConflict: 'publish_date',
-        },
-      );
+      .insert(recordsToInsert as any)
+      .select(); // Return inserted data to verify
 
     if (error) {
       console.error('Error storing sets in collection:', error);
+      console.error('Error details:', JSON.stringify(error, null, 2));
       return {
         success: false,
         error: error.message,
       };
     }
+
+    console.log('Successfully inserted', data?.length || 0, 'records');
 
     // Track usage for all sets (usage tracking happens here after sets are stored)
     for (const entry of sets) {

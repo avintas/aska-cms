@@ -32,17 +32,33 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     //   return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
     // }
 
-    // Parse request body for optional publish_date
+    // Parse request body for numberOfSets, triviaType, overrides, and optional publish_date
     let publishDate: string | undefined;
+    let numberOfSets: number | undefined;
+    let triviaType: 'mc' | 'tf' | 'mix' | undefined;
+    let overrides: {
+      questions_per_set?: number;
+      themes?: string[] | null;
+      balance_themes?: boolean;
+    } | undefined;
     try {
       const body = await request.json();
       publishDate = body.publish_date;
+      numberOfSets = body.numberOfSets;
+      triviaType = body.triviaType || 'mc';
+      if (body.questions_per_set || body.themes !== undefined || body.balance_themes !== undefined) {
+        overrides = {
+          questions_per_set: body.questions_per_set,
+          themes: body.themes,
+          balance_themes: body.balance_themes,
+        };
+      }
     } catch {
-      // No body or invalid JSON, use default (today)
+      // No body or invalid JSON, use defaults
     }
 
     // Build automated sets
-    const result = await buildAutomatedSets(publishDate);
+    const result = await buildAutomatedSets(publishDate, numberOfSets, triviaType, overrides);
 
     if (result.success) {
       return NextResponse.json(

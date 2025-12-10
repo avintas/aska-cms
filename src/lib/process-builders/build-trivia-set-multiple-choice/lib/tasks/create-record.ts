@@ -81,65 +81,20 @@ export const createRecordTask: ProcessBuilderTask = {
         scheduled_for: null,
       };
 
-      // Insert into database
-      const { data, error } = await supabase
-        .from('sets_trivia_multiple_choice')
-        .insert(triviaSet)
-        .select()
-        .single();
-
-      if (error) {
-        // If still a duplicate key error, try one more time with timestamp suffix
-        if (error.message.includes('duplicate key') && error.message.includes('slug')) {
-          const timestampSlug = `${uniqueSlug}-${Date.now()}`;
-          const retryTriviaSet = { ...triviaSet, slug: timestampSlug };
-          const { data: retryData, error: retryError } = await supabase
-            .from('sets_trivia_multiple_choice')
-            .insert(retryTriviaSet)
-            .select()
-            .single();
-
-          if (retryError) {
-            return {
-              success: false,
-              errors: [
-                {
-                  code: 'DATABASE_ERROR',
-                  message: `Failed to create trivia set: ${retryError.message}`,
-                  taskId: 'create-record',
-                  details: retryError,
-                },
-              ],
-            };
-          }
-
-          return {
-            success: true,
-            data: { triviaSet: retryData },
-            metadata: {
-              triviaSetId: retryData.id,
-            },
-          };
-        }
-
-        return {
-          success: false,
-          errors: [
-            {
-              code: 'DATABASE_ERROR',
-              message: `Failed to create trivia set: ${error.message}`,
-              taskId: 'create-record',
-              details: error,
-            },
-          ],
-        };
-      }
+      // Return the set object - it will be stored in collection_trivia_sets as JSONB
+      // No individual table insert needed - sets are stored directly in collection_trivia_sets
+      const completeSet: MultipleChoiceTriviaSet = {
+        ...triviaSet,
+        id: undefined, // No database ID since we're not inserting
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
 
       return {
         success: true,
-        data: { triviaSet: data },
+        data: { triviaSet: completeSet },
         metadata: {
-          triviaSetId: data.id,
+          slug: uniqueSlug,
         },
       };
     } catch (error) {
@@ -160,26 +115,15 @@ export const createRecordTask: ProcessBuilderTask = {
 };
 
 /**
- * Ensure slug uniqueness by checking database and appending suffix if needed
+ * Ensure slug uniqueness by generating a unique slug
+ * Since sets are stored in collection_trivia_sets as JSONB, we just append timestamp for uniqueness
  */
 async function ensureUniqueSlug(
   supabase: ReturnType<typeof getSupabaseAdmin>,
   baseSlug: string,
 ): Promise<string> {
-  // Check if slug exists
-  const { data: existing, error } = await supabase
-    .from('sets_trivia_multiple_choice')
-    .select('slug')
-    .eq('slug', baseSlug)
-    .limit(1)
-    .maybeSingle();
-
-  // If slug doesn't exist (no error and no data), return it as-is
-  if (!existing && !error) {
-    return baseSlug;
-  }
-
-  // Slug exists or there was an error, append timestamp to make it unique
+  // Append timestamp to ensure uniqueness
+  // Sets are stored in collection_trivia_sets as JSONB, so we don't need to check database
   const timestamp = Date.now();
   return `${baseSlug}-${timestamp}`;
 }
